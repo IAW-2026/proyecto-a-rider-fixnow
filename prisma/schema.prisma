@@ -1,0 +1,66 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../app/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Client {
+  id        String   @id @default(uuid())
+  full_name String
+  email     String   @unique
+  direction String
+  is_verified Boolean  @default(false)
+
+  // Relacion: un cliente puede tener muchos jobs 
+  jobs      Job[]
+}
+
+model Job {
+  id          String   @id 
+
+  // Así se relacionan dos tablas dentro de la MISMA base de datos en Prisma:
+  client_id   String
+  client      Client   @relation(fields: [client_id], references: [id])
+
+  service_type ServiceType
+  description String
+  //location    String // En realidad es Point(lat/lng), pero no Prisma no tiene Point
+  lat         Float
+  lng         Float
+  requested_date DateTime? //Solo para Jobs programados, pero no se puede usar como registro para cuando se completa? 
+  urgency     JobUrgency
+  status      JobStatus @default(PENDING) //Al crear un nuevo Job, siempre va a empezar pending
+  professional_id String? 
+  estimated_price Decimal
+  cancelled_at DateTime?
+  cancellation_reason String?
+
+
+}
+
+enum ServiceType {
+  PLOMERIA
+  ELECTRICIDAD
+  GAS
+}
+
+enum JobUrgency {
+  IMMEDIATE
+  SCHEDULED
+}
+
+enum JobStatus {
+  PENDING
+  ACCEPTED
+  IN_PROGRESS
+  COMPLETED 
+  CANCELLED
+} 
