@@ -17,7 +17,7 @@ model Client {
   full_name String
   email     String   @unique
   direction String
-  is_verified Boolean  @default(false)
+  is_verified Boolean  @default(false) 
 
   // Relacion: un cliente puede tener muchos jobs 
   jobs      Job[]
