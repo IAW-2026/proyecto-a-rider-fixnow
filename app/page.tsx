@@ -1,5 +1,5 @@
-import { Show, SignInButton, SignOutButton, UserButton } from "@clerk/nextjs";
+import { WelcomePage } from "@/components/WelcomePage";
 
 export default function Home() {
-  return <h1>Inicio</h1>;
+  return <WelcomePage />;
 }
