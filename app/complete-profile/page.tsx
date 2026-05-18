@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useUser } from "@clerk/nextjs";
@@ -46,7 +46,7 @@ export default function CompleteProfilePage() {
 
   const email = user?.primaryEmailAddress?.emailAddress ?? "";
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.SyntheticEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!user) {
       return;
@@ -56,6 +56,16 @@ export default function CompleteProfilePage() {
     setIsSaving(true);
 
     try {
+      const response = await fetch("/api/profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ fullName, address }),
+      });
+
+      if (!response.ok) {
+        throw new Error("No se pudo guardar el perfil. Intenta de nuevo.");
+      }
+
       const [firstName, ...lastNameParts] = fullName.trim().split(/\s+/);
       const lastName = lastNameParts.join(" ");
 
@@ -70,7 +80,7 @@ export default function CompleteProfilePage() {
       });
 
       router.push("/dashboard");
-    } catch {
+    } catch (error) {
       setError("No se pudo guardar el perfil. Intenta de nuevo.");
     } finally {
       setIsSaving(false);
