@@ -50,7 +50,7 @@ export function AppSidebar({ currentView }: AppSidebarProps) {
       {/* Logo */}
       <div className="flex h-16 items-center gap-3 border-b border-slate-700 px-4">
         <span className="text-4xl font-semibold tracking-tight text-white">
-          FixNow
+          <a href="/">FixNow</a>
         </span>
       </div>
 
