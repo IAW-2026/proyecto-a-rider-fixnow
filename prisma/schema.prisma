@@ -22,7 +22,7 @@ model Client {
 }
 
 model Job {
-  id          String   @id 
+  id          String   @id  @default(uuid())
 
   // Así se relacionan dos tablas dentro de la MISMA base de datos en Prisma:
   client_id   String
