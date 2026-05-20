@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { ServiceType } from "./ServiceCard";
 import { cn } from "@/lib/utils";
+import { useRouter } from "next/navigation";
 
 const DEFAULT_LOCATION = {
   lat: -38.7138,
@@ -79,6 +80,7 @@ export function ServiceRequestModal({
   onSubmit,
   selectedLocation,
 }: ServiceRequestModalProps) {
+  const router = useRouter();
   const [description, setDescription] = useState("");
   const [urgency, setUrgency] = useState<JobUrgency>("immediate");
   const [scheduledDateTime, setScheduledDateTime] = useState("");
@@ -154,11 +156,12 @@ export function ServiceRequestModal({
         return;
       }
 
-      // Éxito: limpiar y notificar al padre
+      // Éxito: limpiar, notificar al padre y al usuario
       setDescription("");
       setUrgency("immediate");
       setScheduledDateTime("");
       onSubmit();
+      router.push("/dashboard/active");
       onOpenChange(false);
     } catch (err) {
       setFormError("Error de red, intenta nuevamente.");
