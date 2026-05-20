@@ -6,7 +6,9 @@ async function getAuthenticatedClient() {
   const user = await currentUser();
 
   if (!user) {
-    return { error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }) };
+    return {
+      error: NextResponse.json({ error: "Unauthorized" }, { status: 401 }),
+    };
   }
 
   const email = user.emailAddresses[0]?.emailAddress;
@@ -55,6 +57,9 @@ export async function GET(
   return NextResponse.json({
     status: job.status,
     professional_id: job.professional_id ?? "JC-12345",
+    cancellation_reason: job.cancellation_reason,
+    cancellation_payment_required: job.cancellation_payment_required,
+    cancelled_at: job.cancelled_at ? job.cancelled_at.toISOString() : null,
   });
 }
 
@@ -110,5 +115,10 @@ export async function POST(
   return NextResponse.json({
     status: updatedJob.status,
     professional_id: updatedJob.professional_id,
+    cancellation_reason: updatedJob.cancellation_reason,
+    cancellation_payment_required: updatedJob.cancellation_payment_required,
+    cancelled_at: updatedJob.cancelled_at
+      ? updatedJob.cancelled_at.toISOString()
+      : null,
   });
 }
