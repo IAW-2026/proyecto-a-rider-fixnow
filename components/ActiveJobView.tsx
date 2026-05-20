@@ -29,6 +29,9 @@ type ActiveJob = {
   service_type: string;
   description: string;
   status: string;
+  cancellation_reason: string | null;
+  cancellation_payment_required: boolean;
+  cancelled_at: string | null;
   urgency: string;
   lat: number;
   lng: number;
@@ -43,6 +46,58 @@ interface ActiveJobViewProps {
 type DriverMockResponse = {
   status: string;
   professional_id: string | null;
+  cancellation_reason?: string | null;
+  cancellation_payment_required?: boolean;
+  cancelled_at?: string | null;
+  requires_payment?: boolean;
+  penalty_amount?: number;
+};
+
+type CancellationReason =
+  | "MUCHO_TIEMPO_ESPERA"
+  | "VALOR_TRABAJO_ALTO"
+  | "CAMBIE_DE_OPINION"
+  | "YA_NO_LO_NECESITO";
+
+type CancellationReasonOption = {
+  value: CancellationReason;
+  title: string;
+  description: string;
+};
+
+const CANCELLATION_REASONS: CancellationReasonOption[] = [
+  {
+    value: "MUCHO_TIEMPO_ESPERA",
+    title: "Mucho tiempo de espera",
+    description:
+      "El profesional tardó más de lo esperado en llegar o responder.",
+  },
+  {
+    value: "VALOR_TRABAJO_ALTO",
+    title: "Valor del trabajo alto",
+    description: "El presupuesto final no me resultó conveniente.",
+  },
+  {
+    value: "CAMBIE_DE_OPINION",
+    title: "Cambié de opinión",
+    description: "Ya no necesito continuar con el servicio solicitado.",
+  },
+  {
+    value: "YA_NO_LO_NECESITO",
+    title: "Ya no lo necesito",
+    description:
+      "El problema se resolvió por otro medio antes de que llegara el profesional.",
+  },
+];
+
+const DEFAULT_CANCELLATION_REASON =
+  CANCELLATION_REASONS[0]?.value ?? "MUCHO_TIEMPO_ESPERA";
+
+type PaymentFlow = {
+  kind: "job" | "penalty";
+  amount: number;
+  title: string;
+  description: string;
 };
 
 function buildSteps(status: string): Step[] {
@@ -104,7 +159,11 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
   const [isRedirectingToPayments, setIsRedirectingToPayments] = useState(false);
+  const [selectedCancellationReason, setSelectedCancellationReason] =
+    useState<CancellationReason>(DEFAULT_CANCELLATION_REASON);
+  const [paymentFlow, setPaymentFlow] = useState<PaymentFlow | null>(null);
 
   useEffect(() => {
     setCurrentJob(job);
@@ -115,13 +174,22 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   const applyServerState = (updatedData: DriverMockResponse) => {
     const nextStatus = updatedData.status.toUpperCase();
     const nextProfessionalId = updatedData.professional_id;
+    const nextCancellationReason = updatedData.cancellation_reason ?? null;
 
     setCurrentJob((prev) => ({
       ...prev,
       status: nextStatus,
       professional_id: nextProfessionalId,
+      cancellation_reason: nextCancellationReason,
+      cancellation_payment_required:
+        updatedData.cancellation_payment_required ??
+        prev.cancellation_payment_required,
+      cancelled_at: updatedData.cancelled_at ?? prev.cancelled_at,
     }));
   };
+
+  const getPenaltyAmount = () =>
+    Math.max(1000, Math.round(currentJob.estimated_price * 0.2));
 
   const refreshStatus = async () => {
     setSyncError(null);
@@ -175,6 +243,27 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   //--------------------------------------------------------------
 
   const openPaymentModal = () => {
+    const isPenaltyPayment =
+      normalizedStatus === "CANCELLED" &&
+      currentJob.cancellation_payment_required;
+
+    setPaymentFlow(
+      isPenaltyPayment
+        ? {
+            kind: "penalty",
+            amount: getPenaltyAmount(),
+            title: "Pago de multa",
+            description:
+              "La cancelación genera una multa porque el trabajo ya estaba asignado o en progreso.",
+          }
+        : {
+            kind: "job",
+            amount: currentJob.estimated_price,
+            title: "Redirigiendo a Payments",
+            description:
+              "Estamos simulando la transición a la app de cobros. Cuando la integración esté lista, aquí se abrirá el flujo real de pago.",
+          },
+    );
     setIsPaymentModalOpen(true);
   };
 
@@ -198,12 +287,88 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     }
   };
 
+  const openCancelModal = () => {
+    setSelectedCancellationReason(DEFAULT_CANCELLATION_REASON);
+    setIsCancelModalOpen(true);
+    setSyncError(null);
+  };
+
+  const confirmCancellation = async () => {
+    setSyncError(null);
+    setIsSyncing(true);
+
+    try {
+      const response = await fetch(
+        `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            reason: selectedCancellationReason,
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+        setSyncError(errorPayload?.error ?? "No se pudo cancelar el servicio.");
+        return;
+      }
+
+      const updatedData = (await response.json()) as DriverMockResponse;
+      applyServerState(updatedData);
+      setIsCancelModalOpen(false);
+
+      if (updatedData.requires_payment) {
+        setPaymentFlow({
+          kind: "penalty",
+          amount: updatedData.penalty_amount ?? getPenaltyAmount(),
+          title: "Pago de multa",
+          description:
+            "La cancelación genera una multa porque el trabajo ya estaba asignado o en progreso.",
+        });
+        setIsPaymentModalOpen(true);
+        return;
+      }
+
+      router.push("/dashboard");
+    } catch (error) {
+      console.error("Error al cancelar el servicio:", error);
+      setSyncError("Error de red al cancelar el servicio.");
+    } finally {
+      setIsSyncing(false);
+    }
+  };
+
   const steps = useMemo(() => buildSteps(normalizedStatus), [normalizedStatus]);
 
   const completedSteps = steps.filter((step) => step.completed).length;
   const progress = (completedSteps / steps.length) * 100;
   const serviceLabel = getServiceLabel(currentJob.service_type);
   const statusLabel = getStatusLabel(normalizedStatus);
+  const shouldShowPaymentButton =
+    normalizedStatus === "COMPLETED" ||
+    (normalizedStatus === "CANCELLED" &&
+      currentJob.cancellation_payment_required);
+  const paymentButtonLabel =
+    normalizedStatus === "CANCELLED" ? "ABONAR MULTA" : "ABONAR TRABAJO";
+  const paymentButtonClass =
+    serviceLabel === "Electricidad"
+      ? "bg-electrical text-slate-950 hover:bg-yellow-300"
+      : serviceLabel === "Gas"
+        ? "bg-gas text-slate-950 hover:bg-orange-300"
+        : serviceLabel === "Plomería"
+          ? "bg-plumbing text-slate-950 hover:bg-cyan-300"
+          : "bg-amber-400 text-slate-950 hover:bg-amber-300";
+  const cancellationSummary = currentJob.cancellation_reason
+    ? CANCELLATION_REASONS.find(
+        (reason) => reason.value === currentJob.cancellation_reason,
+      )
+    : undefined;
 
   return (
     <div className="space-y-10">
@@ -216,15 +381,26 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             <p className="mt-1 text-lg text-slate-400">
               Seguimiento en tiempo real de tu servicio
             </p>
+            {normalizedStatus === "CANCELLED" && cancellationSummary && (
+              <p className="mt-2 max-w-2xl text-sm text-slate-300">
+                Motivo de cancelación: {cancellationSummary.title}
+              </p>
+            )}
+            {currentJob.cancelled_at && (
+              <p className="mt-1 text-sm text-slate-400">
+                Cancelado el{" "}
+                {new Date(currentJob.cancelled_at).toLocaleString("es-AR")}
+              </p>
+            )}
           </div>
 
-          {normalizedStatus === "COMPLETED" && (
+          {shouldShowPaymentButton && (
             <Button
               type="button"
               onClick={openPaymentModal}
-              className="h-14 min-w-56 rounded-xl bg-green-500 px-8 mt-5 text-base font-semibold tracking-wide text-black shadow-sm transition-colors hover:bg-amber-300 hover:shadow-xl"
+              className={`w-full rounded-2xl px-8 py-6 text-base font-semibold tracking-wide shadow-lg transition-transform hover:-translate-y-0.5 hover:shadow-xl lg:w-auto ${paymentButtonClass}`}
             >
-              Abonar servicio
+              {paymentButtonLabel}
             </Button>
           )}
         </div>
@@ -251,6 +427,18 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             className="bg-amber-400 text-slate-950 hover:bg-amber-300"
           >
             Simular avance
+          </Button>
+          <Button
+            type="button"
+            onClick={openCancelModal}
+            disabled={
+              isSyncing ||
+              normalizedStatus === "COMPLETED" ||
+              normalizedStatus === "CANCELLED"
+            }
+            className="bg-red-500 text-slate-950 hover:bg-red-400"
+          >
+            Cancelar servicio
           </Button>
           {syncError && (
             <span className="text-sm text-red-300">{syncError}</span>
@@ -354,12 +542,12 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                     src="/avatar-professional.jpg"
                     alt="Profesional asignado"
                   />
-                  <AvatarFallback className="bg-slate-700 text-lg text-white">
+                  <AvatarFallback className="bg-slate-700 text-xl text-white">
                     PR
                   </AvatarFallback>
                 </Avatar>
 
-                <div className="flex-1">
+                <div className="flex-1 ml-10">
                   <p className="font-semibold text-white">
                     Profesional asignado
                   </p>
@@ -486,7 +674,83 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           </div>
         </section>
       </div>
+      <AppModal
+        open={isCancelModalOpen}
+        onOpenChange={(open) => {
+          setIsCancelModalOpen(open);
+          if (!open) {
+            setSelectedCancellationReason(DEFAULT_CANCELLATION_REASON);
+          }
+        }}
+        title="Cancelar servicio"
+        description="Elegí el motivo de la cancelación. Se guardará en el historial junto con la fecha y hora exactas."
+        icon={<Clock className="size-7 text-amber-300" />}
+        className="max-h-[90vh] w-[92vw] max-w-2xl overflow-y-auto border-slate-700 bg-slate-900 text-white"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
+              onClick={() => setIsCancelModalOpen(false)}
+              disabled={isSyncing}
+            >
+              Volver
+            </Button>
+            <Button
+              type="button"
+              className="flex-1 bg-red-500 text-slate-950 hover:bg-red-400"
+              onClick={confirmCancellation}
+              disabled={isSyncing}
+            >
+              {isSyncing ? "Cancelando..." : "Confirmar cancelación"}
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-3">
+          {CANCELLATION_REASONS.map((reason) => {
+            const isSelected = selectedCancellationReason === reason.value;
 
+            return (
+              <button
+                key={reason.value}
+                type="button"
+                onClick={() => setSelectedCancellationReason(reason.value)}
+                className={`flex w-full items-start gap-3 rounded-2xl border p-4 text-left transition-colors ${
+                  isSelected
+                    ? "border-amber-400 bg-amber-400/10"
+                    : "border-slate-700 bg-slate-900 hover:border-slate-600 hover:bg-slate-800"
+                }`}
+              >
+                <span
+                  className={`mt-0.5 flex size-5 items-center justify-center rounded-full border ${
+                    isSelected
+                      ? "border-amber-300 bg-amber-400 text-slate-950"
+                      : "border-slate-500 text-transparent"
+                  }`}
+                >
+                  <CheckCircle2 className="size-3" />
+                </span>
+                <span className="flex-1">
+                  <span className="block font-semibold text-white">
+                    {reason.title}
+                  </span>
+                  <span className="mt-1 block text-sm text-slate-400">
+                    {reason.description}
+                  </span>
+                </span>
+              </button>
+            );
+          })}
+          {normalizedStatus !== "PENDING" && (
+            <p className="rounded-2xl border border-amber-400/20 bg-amber-400/10 p-3 text-sm text-amber-100">
+              Como el trabajo ya fue aceptado o está en progreso, esta
+              cancelación puede generar una multa.
+            </p>
+          )}
+        </div>
+      </AppModal>
       <AppModal
         open={isPaymentModalOpen}
         onOpenChange={(open) => {
@@ -495,15 +759,18 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             setIsRedirectingToPayments(false);
           }
         }}
-        title="Redirigiendo a Payments"
-        description="Estamos simulando la transición a la app de cobros. Cuando la integración esté lista, aquí se abrirá el flujo real de pago."
+        title={paymentFlow?.title ?? "Redirigiendo a Payments"}
+        description={
+          paymentFlow?.description ??
+          "Estamos simulando la transición a la app de cobros. Cuando la integración esté lista, aquí se abrirá el flujo real de pago."
+        }
         icon={<Zap className="size-7 text-amber-300" />}
         footer={
           <>
             <Button
               type="button"
               variant="outline"
-              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
+              className="flex-1 cursor-pointer border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
               onClick={() => setIsPaymentModalOpen(false)}
               disabled={isRedirectingToPayments}
             >
@@ -511,11 +778,13 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             </Button>
             <Button
               type="button"
-              className="flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300"
+              className="flex-1 cursor-pointer bg-amber-400 text-slate-950 hover:bg-amber-300"
               onClick={confirmPayment}
               disabled={isRedirectingToPayments}
             >
-              {isRedirectingToPayments ? "Redirigiendo..." : "Ir a Payments"}
+              {isRedirectingToPayments
+                ? "Redirigiendo..."
+                : `Ir a Payments${paymentFlow ? ` ($${paymentFlow.amount.toLocaleString("es-AR")})` : ""}`}
             </Button>
           </>
         }

@@ -61,8 +61,25 @@ export default async function ActivePage() {
     },
   });
 
+  const penaltyJob = activeJob
+    ? null
+    : await prisma.job.findFirst({
+        where: client
+          ? {
+              client_id: client.id,
+              status: "CANCELLED",
+              cancellation_payment_required: true,
+            }
+          : undefined,
+        orderBy: {
+          id: "desc",
+        },
+      });
+
+  const visibleJob = activeJob ?? penaltyJob;
+
   // 2- Si el cliente no tiene ningun trabajo activo, mostramos un cartel y boton para ir al dashboard y crear uno
-  if (!activeJob) {
+  if (!visibleJob) {
     return (
       <div className="flex">
         <AppSidebar currentView="active" />
@@ -89,15 +106,20 @@ export default async function ActivePage() {
   // 3- Serializamos los datos (Prisma guarda numeros decimales raros que TS
   // a veces no puede pasar directo a componentes cliente)
   const serializedJob = {
-    id: activeJob.id,
-    service_type: activeJob.service_type,
-    description: activeJob.description,
-    status: activeJob.status,
-    urgency: activeJob.urgency,
-    lat: activeJob.lat,
-    lng: activeJob.lng,
-    estimated_price: Number(activeJob.estimated_price),
-    professional_id: activeJob.professional_id,
+    id: visibleJob.id,
+    service_type: visibleJob.service_type,
+    description: visibleJob.description,
+    status: visibleJob.status,
+    cancellation_reason: visibleJob.cancellation_reason,
+    cancellation_payment_required: visibleJob.cancellation_payment_required,
+    cancelled_at: visibleJob.cancelled_at
+      ? visibleJob.cancelled_at.toISOString()
+      : null,
+    urgency: visibleJob.urgency,
+    lat: visibleJob.lat,
+    lng: visibleJob.lng,
+    estimated_price: Number(visibleJob.estimated_price),
+    professional_id: visibleJob.professional_id,
   };
 
   return (

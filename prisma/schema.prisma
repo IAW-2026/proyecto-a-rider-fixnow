@@ -40,6 +40,7 @@ model Job {
   estimated_price Decimal
   cancelled_at DateTime?
   cancellation_reason String?
+  cancellation_payment_required Boolean @default(false)
 
 
 }

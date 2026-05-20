@@ -189,7 +189,7 @@ export function ServiceRequestModal({
             >
               <Icon className="size-8 text-white" />
             </div>
-            <DialogTitle className={cn("text-xl font-semibold", config.color)}>
+            <DialogTitle className={cn("text-xl font-semibold")}>
               Solicitar servicios de {config.label}
             </DialogTitle>
           </div>
