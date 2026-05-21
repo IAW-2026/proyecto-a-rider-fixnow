@@ -15,18 +15,24 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import type { ServiceType } from "./ServiceCard";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 
-const DEFAULT_LOCATION = {
-  lat: -38.7138,
-  lng: -62.2594,
-};
+// Cargamos el componente de manera Lazy Loagding el SSR
+const MapDisplay = dynamic(() => import("@/components/MapDisplay"), {
+  ssr: false,
+  loading: () => (
+    <div className="h-50 w-full animate-pulse rounded-lg bg-slate-200 flex items-center justify-center">
+      <span className="text-sm text-slate-500">Cargando mapa...</span>
+    </div>
+  ),
+});
 
 interface ServiceRequestModalProps {
   service: ServiceType | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSubmit: () => void;
-  selectedLocation?: { lat: number; lng: number } | null;
+  clientAddress: string;
 }
 
 type JobUrgency = "immediate" | "scheduled";
@@ -78,7 +84,7 @@ export function ServiceRequestModal({
   open,
   onOpenChange,
   onSubmit,
-  selectedLocation,
+  clientAddress,
 }: ServiceRequestModalProps) {
   const router = useRouter();
   const [description, setDescription] = useState("");
@@ -86,6 +92,8 @@ export function ServiceRequestModal({
   const [scheduledDateTime, setScheduledDateTime] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [lat, setLat] = useState<number | null>(null);
+  const [lng, setLng] = useState<number | null>(null);
 
   if (!service) return null;
 
@@ -125,16 +133,18 @@ export function ServiceRequestModal({
       }
     }
 
+    if (lat === null || lng === null) {
+      setFormError("Esperando a ubicar tu dirección en el mapa...");
+      return;
+    }
+
     setSubmitting(true);
     try {
-      const location = selectedLocation ?? DEFAULT_LOCATION;
       const payload = {
         service_type: service,
         description: description.trim(),
-        // Preferir la ubicación pasada desde el componente padre (mapa);
-        // mientras tanto, usar una ubicación provisional para evitar romper el flujo.
-        lat: location.lat,
-        lng: location.lng,
+        lat: lat,
+        lng: lng,
         urgency,
         requested_date:
           urgency === "scheduled"
@@ -156,11 +166,13 @@ export function ServiceRequestModal({
         return;
       }
 
-      // Éxito: limpiar, notificar al padre y al usuario
       setDescription("");
       setUrgency("immediate");
       setScheduledDateTime("");
       onSubmit();
+
+      router.refresh();
+
       router.push("/dashboard/active");
       onOpenChange(false);
     } catch (err) {
@@ -272,45 +284,26 @@ export function ServiceRequestModal({
           </div>
 
           {/* Map Section */}
-          <div className="space-y-2">
+          <div className="space-y-2 flex flex-col">
             <Label className="text-sm font-medium text-slate-900">
               Confirmar ubicación
             </Label>
-            <div className="relative mt-2 h-50 overflow-hidden rounded-lg border border-slate-300 bg-slate-200">
-              {/* Simulated Map */}
-              <div className="absolute inset-0 bg-linear-to-br ">
-                <div className="absolute inset-0 opacity-20">
-                  {/* Grid pattern */}
-                  <div
-                    className="h-full w-full"
-                    style={{
-                      backgroundImage: `
-                        linear-gradient(to right, rgba(100, 116, 139, 0.5) 1px, transparent 1px),
-                        linear-gradient(to bottom, rgba(100, 116, 139, 0.5) 1px, transparent 1px)
-                      `,
-                      backgroundSize: "40px 40px",
-                    }}
-                  />
-                </div>
-                {/* Location marker */}
-                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-                  <div className="relative">
-                    <div className="absolute -inset-4 animate-ping rounded-full bg-plumbing/20" />
-                    <div className="relative flex size-8 items-center justify-center rounded-full bg-amber-400 shadow-lg">
-                      <MapPin className="size-4 text-slate-950" />
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="absolute bottom-3 left-3 rounded-md bg-slate-900 px-2.5 py-1.5 text-xs font-medium shadow-sm border border-slate-700">
-                <span className="text-slate-200">
-                  Ubicación provisional hasta integrar el mapa
-                </span>
-              </div>
+
+            <div className="relative mt-2 h-50 w-full overflow-hidden rounded-lg">
+              <MapDisplay
+                address={clientAddress}
+                onCoordinatesFound={(encontradoLat, encontradoLng) => {
+                  setLat(encontradoLat);
+                  setLng(encontradoLng);
+                }}
+              />
             </div>
-            <p className="text-xs text-slate-600">
-              La ubicación se completará automáticamente cuando conectes el mapa
-              real.
+
+            <p className="text-xs text-slate-600 mt-2">
+              Se enviará al profesional a la dirección de tu cuenta:{" "}
+              <span className="font-semibold text-slate-800">
+                {clientAddress}
+              </span>
             </p>
           </div>
         </div>
@@ -321,7 +314,6 @@ export function ServiceRequestModal({
               {formError}
             </p>
           )}
-
           <div className="flex justify-end gap-3">
             <Button
               variant="outline"
@@ -332,7 +324,8 @@ export function ServiceRequestModal({
             </Button>
             <Button
               onClick={handleSubmit}
-              disabled={submitting || !description.trim()}
+              // Bloqueamos el botón si no tenemos descripción O si el mapa aún no trajo las coordenadas
+              disabled={submitting || !description.trim() || lat === null}
               className="cursor-pointer bg-amber-400 text-slate-950 font-semibold hover:bg-amber-300 disabled:bg-slate-300 disabled:text-slate-500 px-6"
             >
               {submitting ? "Enviando..." : "Enviar Solicitud"}

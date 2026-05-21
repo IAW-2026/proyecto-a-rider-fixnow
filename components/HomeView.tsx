@@ -6,9 +6,10 @@ import { ServiceRequestModal } from "./ServiceRequestModal";
 
 interface HomeViewProps {
   userName?: string;
+  address: string;
 }
 
-export function HomeView({ userName = "Catalina" }: HomeViewProps) {
+export function HomeView({ userName = "Catalina", address }: HomeViewProps) {
   const [selectedService, setSelectedService] = useState<ServiceType | null>(
     null,
   );
@@ -20,7 +21,6 @@ export function HomeView({ userName = "Catalina" }: HomeViewProps) {
   };
 
   const handleSubmit = () => {
-    // TODO: Agregar funcionalidad de envío de solicitud
     setSelectedService(null);
     setModalOpen(false);
   };
@@ -67,6 +67,7 @@ export function HomeView({ userName = "Catalina" }: HomeViewProps) {
         open={modalOpen}
         onOpenChange={setModalOpen}
         onSubmit={handleSubmit}
+        clientAddress={address}
       />
     </div>
   );

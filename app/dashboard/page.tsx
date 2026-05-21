@@ -20,7 +20,7 @@ export default async function DashboardPage() {
     <div className="flex bg-slate-950 min-h-screen">
       <AppSidebar currentView="home" />
       <main className="ml-64 flex-1 p-12 bg-[#2C446C]">
-        <HomeView userName={userFullName} />
+        <HomeView userName={userFullName} address={profileAddress as string} />
       </main>
     </div>
   );
