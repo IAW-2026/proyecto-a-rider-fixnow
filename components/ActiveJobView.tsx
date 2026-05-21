@@ -16,6 +16,13 @@ import {
   Flame,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
+
+// Importamos el mapa apagando el Server Side Rendering
+const JobTrackerMap = dynamic(() => import("@/components/JobTrackerMap"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse bg-slate-800" />,
+});
 
 type Step = {
   id: number;
@@ -271,15 +278,14 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsRedirectingToPayments(true);
 
     try {
-      // 1- Le avisamos a la BD que simulamos el pago exitoso
       await fetch(`/api/v1/driver-mock/${currentJob.id}/simulate-payment`, {
         method: "POST",
       });
 
-      // 2- Esperamos un seg por la animacion y redireccionamos al Dashboard
+      router.refresh();
+
       window.setTimeout(() => {
         router.push("/dashboard");
-        router.refresh();
       }, 1400);
     } catch (error) {
       console.error("Error al simular el pago:", error);
@@ -334,6 +340,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         setIsPaymentModalOpen(true);
         return;
       }
+      router.refresh();
 
       router.push("/dashboard");
     } catch (error) {
@@ -604,67 +611,36 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         </div>
 
         <section className="relative min-h-115 overflow-hidden rounded-lg border border-slate-700 bg-slate-900">
-          <div className="absolute inset-0 bg-linear-to-br from-slate-800 to-slate-900">
-            <div className="absolute inset-0 opacity-30">
-              <div
-                className="h-full w-full"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(to right, rgba(100,116,139,0.35) 1px, transparent 1px), linear-gradient(to bottom, rgba(100,116,139,0.35) 1px, transparent 1px)",
-                  backgroundSize: "60px 60px",
-                }}
-              />
-            </div>
-
-            {normalizedStatus !== "PENDING" && (
-              <svg
-                className="absolute inset-0 h-full w-full"
-                viewBox="0 0 400 400"
-              >
-                <path
-                  d="M 95 310 Q 160 210 210 230 T 290 155"
-                  fill="none"
-                  stroke="#f59e0b"
-                  strokeWidth="3"
-                  strokeDasharray="8 4"
-                  className="animate-pulse"
-                />
-              </svg>
-            )}
-
-            <div className="absolute left-[71%] top-[37%]">
-              <div className="relative">
-                <div className="absolute -inset-3 animate-ping rounded-full bg-amber-400/30" />
-                <div className="relative flex size-10 items-center justify-center rounded-full border-2 border-slate-900 bg-amber-400 shadow-lg">
-                  <Zap className="size-5 text-slate-950" />
-                </div>
-              </div>
-            </div>
-
-            <div className="absolute left-[23%] top-[76%]">
-              <div className="flex size-8 items-center justify-center rounded-full bg-slate-100 shadow-lg">
-                <MapPin className="size-4 text-slate-900" />
-              </div>
-            </div>
+          {/* EL MAPA REAL */}
+          <div className="absolute inset-0">
+            <JobTrackerMap
+              clientLocation={{ lat: currentJob.lat, lng: currentJob.lng }}
+              status={normalizedStatus}
+              // TRUCO MOCK: Si está aceptado/en progreso, generamos coordenadas falsas sumándole 0.01 a la lat/lng del cliente para simular que está a unas cuadras.
+              professionalLocation={
+                normalizedStatus === "ACCEPTED"
+                  ? { lat: currentJob.lat + 0.01, lng: currentJob.lng + 0.01 }
+                  : normalizedStatus === "IN_PROGRESS"
+                    ? { lat: currentJob.lat, lng: currentJob.lng }
+                    : null
+              }
+            />
           </div>
 
-          <div className="absolute right-3 top-3 flex flex-col gap-2">
-            <button className="flex size-8 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-white shadow-sm transition-colors hover:bg-slate-700">
-              <span className="text-lg font-medium">+</span>
-            </button>
-            <button className="flex size-8 items-center justify-center rounded-md border border-slate-700 bg-slate-800 text-white shadow-sm transition-colors hover:bg-slate-700">
-              <span className="text-lg font-medium">−</span>
-            </button>
-          </div>
-
-          <div className="absolute bottom-4 left-4 right-4 rounded-lg border border-slate-700 bg-slate-800/95 p-3 shadow-lg backdrop-blur-sm">
+          <div className="absolute bottom-4 left-4 right-4 z-[400] rounded-lg border border-slate-700 bg-slate-800/95 p-3 shadow-lg backdrop-blur-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
-                <div className="size-2 animate-pulse rounded-full bg-green-500" />
+                <div
+                  className={`size-2 animate-pulse rounded-full ${normalizedStatus === "PENDING" ? "bg-amber-400" : "bg-green-500"}`}
+                />
                 <span className="text-sm font-medium text-white">
                   {normalizedStatus === "PENDING"
                     ? "Buscando profesionales cerca"
-                    : "El profesional está en camino"}
+                    : normalizedStatus === "ACCEPTED"
+                      ? "El profesional está en camino"
+                      : normalizedStatus === "IN_PROGRESS"
+                        ? "El profesional llegó a tu ubicación"
+                        : ""}
                 </span>
               </div>
               <span className="text-xs text-slate-400">
