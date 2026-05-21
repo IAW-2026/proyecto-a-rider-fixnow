@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect } from "react";
+import { useState } from "react";
 // 1. IMPORTAMOS 'Circle' DE REACT-LEAFLET
 import {
   MapContainer,
@@ -64,10 +65,19 @@ export default function JobTrackerMap({
   professionalLocation,
   status,
 }: JobTrackerMapProps) {
+  const [isMounted, setIsMounted] = useState(false);
   const clientPos: [number, number] = [clientLocation.lat, clientLocation.lng];
   const proPos: [number, number] | null = professionalLocation
     ? [professionalLocation.lat, professionalLocation.lng]
     : null;
+
+  useEffect(() => {
+    setIsMounted(true);
+  }, []);
+
+  if (!isMounted) {
+    return <div className="h-full w-full animate-pulse bg-slate-800" />;
+  }
 
   return (
     <div className="h-full w-full relative z-0">

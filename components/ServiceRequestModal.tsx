@@ -108,6 +108,16 @@ export function ServiceRequestModal({
       return;
     }
 
+    if (urgency === "immediate") {
+      const currentHour = new Date().getHours();
+      if (currentHour < 8 || currentHour >= 18) {
+        setFormError(
+          "Los servicios inmediatos solo están disponibles entre las 08:00hs y las 18:00hs.",
+        );
+        return;
+      }
+    }
+
     if (urgency === "scheduled") {
       if (!scheduledDateTime) {
         setFormError(

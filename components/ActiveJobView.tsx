@@ -278,9 +278,24 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsRedirectingToPayments(true);
 
     try {
-      await fetch(`/api/v1/driver-mock/${currentJob.id}/simulate-payment`, {
-        method: "POST",
-      });
+      const response = await fetch(
+        `/api/v1/driver-mock/${currentJob.id}/simulate-payment`,
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        const errorPayload = (await response.json().catch(() => null)) as {
+          error?: string;
+        } | null;
+
+        setSyncError(
+          errorPayload?.error ?? "No se pudo registrar el pago del trabajo.",
+        );
+        setIsRedirectingToPayments(false);
+        return;
+      }
 
       router.refresh();
 
@@ -364,13 +379,16 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   const paymentButtonLabel =
     normalizedStatus === "CANCELLED" ? "ABONAR MULTA" : "ABONAR TRABAJO";
   const paymentButtonClass =
-    serviceLabel === "Electricidad"
-      ? "bg-electrical text-slate-950 hover:bg-yellow-300"
-      : serviceLabel === "Gas"
-        ? "bg-gas text-slate-950 hover:bg-orange-300"
-        : serviceLabel === "Plomería"
-          ? "bg-plumbing text-slate-950 hover:bg-cyan-300"
-          : "bg-amber-400 text-slate-950 hover:bg-amber-300";
+    normalizedStatus === "CANCELLED" && currentJob.cancellation_payment_required
+      ? "bg-red-500 text-slate-950 hover:bg-red-400"
+      : serviceLabel === "Electricidad"
+        ? "bg-electrical text-slate-950 hover:bg-yellow-300"
+        : serviceLabel === "Gas"
+          ? "bg-gas text-slate-950 hover:bg-orange-300"
+          : serviceLabel === "Plomería"
+            ? "bg-plumbing text-slate-950 hover:bg-cyan-300"
+            : "bg-amber-400 text-slate-950 hover:bg-amber-300";
+
   const cancellationSummary = currentJob.cancellation_reason
     ? CANCELLATION_REASONS.find(
         (reason) => reason.value === currentJob.cancellation_reason,
@@ -389,12 +407,12 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
               Seguimiento en tiempo real de tu servicio
             </p>
             {normalizedStatus === "CANCELLED" && cancellationSummary && (
-              <p className="mt-2 max-w-2xl text-sm text-slate-300">
+              <p className="mt-2 max-w-2xl text-sm text-red-500">
                 Motivo de cancelación: {cancellationSummary.title}
               </p>
             )}
             {currentJob.cancelled_at && (
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-red-500">
                 Cancelado el{" "}
                 {new Date(currentJob.cancelled_at).toLocaleString("es-AR")}
               </p>
@@ -627,7 +645,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             />
           </div>
 
-          <div className="absolute bottom-4 left-4 right-4 z-[400] rounded-lg border border-slate-700 bg-slate-800/95 p-3 shadow-lg backdrop-blur-sm">
+          <div className="absolute bottom-4 left-4 right-4 z-400 rounded-lg border border-slate-700 bg-slate-800/95 p-3 shadow-lg backdrop-blur-sm">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
                 <div
