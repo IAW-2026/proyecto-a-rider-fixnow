@@ -40,8 +40,8 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // Extraemos los datos que el frontend recolecto del modal
-    const { service_type, description, lat, lng, urgency, requested_date } =
-      body;
+    const { service_type, description, lat, lng, urgency } = body;
+    let requested_date = body.requested_date;
 
     const serviceTypeMap: Record<string, "PLOMERIA" | "ELECTRICIDAD" | "GAS"> =
       {
@@ -115,6 +115,19 @@ export async function POST(req: Request) {
       if (hour < 8 || hour >= 18) {
         return NextResponse.json(
           { error: "Scheduled date must be between 8am and 6pm" },
+          { status: 400 },
+        );
+      }
+    }
+
+    if (prismaUrgency === "IMMEDIATE") {
+      const now = new Date();
+      const hour = now.getHours();
+      requested_date = now; // For immediate jobs, we set the requested_date to now
+
+      if (hour < 8 || hour >= 18) {
+        return NextResponse.json(
+          { error: "Immediate jobs can only be created between 8am and 6pm" },
           { status: 400 },
         );
       }
