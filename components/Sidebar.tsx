@@ -1,6 +1,15 @@
 "use client";
 
-import { Home, Wrench, History, User, Settings, LogOut } from "lucide-react";
+import {
+  Home,
+  Wrench,
+  History,
+  User,
+  Settings,
+  LogOut,
+  Clock,
+  Calendar,
+} from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -13,7 +22,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { SignOutButton, useUser } from "@clerk/nextjs";
 
-type View = "home" | "active" | "history";
+type View = "home" | "active" | "history" | "scheduled";
 
 interface AppSidebarProps {
   currentView: View;
@@ -32,6 +41,12 @@ const navItems = [
     label: "Mi Historial",
     icon: History,
     href: "/dashboard/history",
+  },
+  {
+    id: "scheduled" as const,
+    label: "Turnos Programados",
+    icon: Calendar,
+    href: "/dashboard/scheduled",
   },
 ];
 
