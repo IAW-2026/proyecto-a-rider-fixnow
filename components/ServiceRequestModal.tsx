@@ -108,16 +108,6 @@ export function ServiceRequestModal({
       return;
     }
 
-    if (urgency === "immediate") {
-      const currentHour = new Date().getHours();
-      if (currentHour < 8 || currentHour >= 18) {
-        setFormError(
-          "Los servicios inmediatos solo están disponibles entre las 08:00hs y las 18:00hs.",
-        );
-        return;
-      }
-    }
-
     if (urgency === "scheduled") {
       if (!scheduledDateTime) {
         setFormError(
@@ -131,13 +121,6 @@ export function ServiceRequestModal({
       if (selected <= now) {
         setFormError(
           "La fecha y hora deben ser futuras para servicios programados.",
-        );
-        return;
-      }
-      const hour = selected.getHours();
-      if (hour < 8 || hour >= 18) {
-        setFormError(
-          "Los servicios programados deben ser entre las 08:00hs y las 18:00hs.",
         );
         return;
       }
@@ -176,6 +159,8 @@ export function ServiceRequestModal({
         return;
       }
 
+      const selectedUrgency = urgency;
+
       setDescription("");
       setUrgency("immediate");
       setScheduledDateTime("");
@@ -183,7 +168,12 @@ export function ServiceRequestModal({
 
       router.refresh();
 
-      router.push("/dashboard/active");
+      if (selectedUrgency === "scheduled") {
+        router.push("/dashboard/scheduled"); // Al nuevo panel de turnos
+      } else {
+        router.push("/dashboard/active"); // Al seguimiento en vivo
+      }
+
       onOpenChange(false);
     } catch (err) {
       setFormError("Error de red, intenta nuevamente.");

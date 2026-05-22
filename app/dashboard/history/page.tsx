@@ -36,18 +36,27 @@ export default async function HistoryPage() {
       orderBy: { requested_date: { sort: "desc", nulls: "last" } },
     });
 
-    serializedJobs = jobs.map((job) => ({
-      id: job.id,
-      service_type: job.service_type,
-      description: job.description,
-      status: job.status,
-      estimated_price: Number(job.estimated_price),
-      requested_date: job.requested_date
-        ? job.requested_date.toISOString()
-        : null,
-      professional_id: job.professional_id,
-      cancellation_payment_required: job.cancellation_payment_required,
-    }));
+    serializedJobs = jobs.map((job) => {
+      const isCancelled = job.status === "CANCELLED";
+      const hadPenalty = isCancelled && job.professional_id !== null;
+
+      return {
+        id: job.id,
+        service_type: job.service_type,
+        description: job.description,
+        status: job.status,
+        estimated_price: isCancelled
+          ? hadPenalty
+            ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
+            : 0
+          : Number(job.estimated_price),
+        requested_date: job.requested_date
+          ? job.requested_date.toISOString()
+          : null,
+        professional_id: job.professional_id,
+        cancellation_payment_required: job.cancellation_payment_required,
+      };
+    });
   }
 
   return (

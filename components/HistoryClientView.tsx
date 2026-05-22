@@ -59,7 +59,7 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
   // --- CÁLCULO DE MÉTRICAS (Dashboard Financiero) ---
   const paidJobs = jobs.filter((j) => j.status === "PAID");
   const cancelledJobs = jobs.filter((j) => j.status === "CANCELLED");
-  const totalSpent = paidJobs.reduce(
+  const totalSpent = jobs.reduce(
     (acc, current) => acc + current.estimated_price,
     0,
   );

@@ -110,27 +110,12 @@ export async function POST(req: Request) {
           { status: 400 },
         );
       }
-
-      const hour = scheduledDate.getHours();
-      if (hour < 8 || hour >= 18) {
-        return NextResponse.json(
-          { error: "Scheduled date must be between 8am and 6pm" },
-          { status: 400 },
-        );
-      }
     }
 
     if (prismaUrgency === "IMMEDIATE") {
       const now = new Date();
       const hour = now.getHours();
       requested_date = now; // For immediate jobs, we set the requested_date to now
-
-      if (hour < 8 || hour >= 18) {
-        return NextResponse.json(
-          { error: "Immediate jobs can only be created between 8am and 6pm" },
-          { status: 400 },
-        );
-      }
     }
 
     // Convertimos el string de fecha que manda el frontend a un objeto Date real para Prisma

@@ -35,10 +35,18 @@ export default async function DashboardPage() {
       where: {
         client_id: dbClient.id,
         OR: [
+          // Trabajos INMEDIATOS que estén activos
           {
+            urgency: "IMMEDIATE",
             status: { in: ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED"] },
           },
-          { status: "CANCELLED", cancellation_payment_required: true }, // <-- Lo atrapamos acá
+          // Trabajos PROGRAMADOS que ya estén ocurriendo hoy (en progreso o a pagar)
+          {
+            urgency: "SCHEDULED",
+            status: { in: ["IN_PROGRESS", "COMPLETED"] },
+          },
+          // Cancelados con multa pendiente (sin importar si eran inmediatos o programados)
+          { status: "CANCELLED", cancellation_payment_required: true },
         ],
       },
       orderBy: { requested_date: { sort: "desc", nulls: "last" } },
@@ -72,17 +80,26 @@ export default async function DashboardPage() {
       take: 4,
     });
 
-    serializedRecentJobs = recentJobs.map((job) => ({
-      id: job.id,
-      service_type: job.service_type,
-      description: job.description,
-      status: job.status,
-      estimated_price: Number(job.estimated_price),
-      requested_date: job.requested_date
-        ? job.requested_date.toISOString()
-        : null,
-      professional_id: job.professional_id,
-    }));
+    serializedRecentJobs = recentJobs.map((job) => {
+      const isCancelled = job.status === "CANCELLED";
+      const hadPenalty = isCancelled && job.professional_id !== null;
+
+      return {
+        id: job.id,
+        service_type: job.service_type,
+        description: job.description,
+        status: job.status,
+        estimated_price: isCancelled
+          ? hadPenalty
+            ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
+            : 0
+          : Number(job.estimated_price),
+        requested_date: job.requested_date
+          ? job.requested_date.toISOString()
+          : null,
+        professional_id: job.professional_id,
+      };
+    });
 
     return (
       <div className="flex bg-slate-950 min-h-screen">
