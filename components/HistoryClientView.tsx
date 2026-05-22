@@ -28,9 +28,9 @@ interface HistoryClientViewProps {
 }
 
 const getServiceIcon = (type: string) => {
-  if (type === "electricidad")
+  if (type === "ELECTRICIDAD")
     return <Zap className="size-5 text-electrical" />;
-  if (type === "gas") return <Flame className="size-5 text-gas" />;
+  if (type === "GAS") return <Flame className="size-5 text-gas" />;
   return <Droplets className="size-5 text-plumbing" />;
 };
 

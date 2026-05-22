@@ -15,9 +15,10 @@ export default async function HistoryPage() {
   }
 
   const profileAddress = user?.unsafeMetadata?.address;
+  const profilePhone = user?.unsafeMetadata?.phone;
   const email = user.emailAddresses[0]?.emailAddress;
 
-  if (!profileAddress) {
+  if (!profileAddress || !profilePhone) {
     redirect("/complete-profile");
   }
 

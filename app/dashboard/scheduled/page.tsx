@@ -13,9 +13,10 @@ export default async function ScheduledPage() {
   if (!user) redirect("/sign-in");
 
   const profileAddress = user?.unsafeMetadata?.address;
+  const profilePhone = user?.unsafeMetadata?.phone;
   const email = user.emailAddresses[0]?.emailAddress;
 
-  if (!profileAddress) redirect("/complete-profile");
+  if (!profileAddress || !profilePhone) redirect("/complete-profile");
 
   const dbClient = await prisma.client.findUnique({
     where: { email: email as string },
