@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { AppModal } from "@/components/ui/app-modal";
 import { Button } from "@/components/ui/button";
+import { ProfessionalProfileModal } from "@/components/ProfessionalProfileModal";
 
 type JobSummary = {
   id: string;
@@ -55,7 +56,13 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
   const [selectedHistoryJob, setSelectedHistoryJob] =
     useState<JobSummary | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [profModalOpen, setProfModalOpen] = useState(false);
+  const [selectedProfId, setSelectedProfId] = useState<string | null>(null);
 
+  const handleOpenProfProfile = (profId: string) => {
+    setSelectedProfId(profId);
+    setProfModalOpen(true);
+  };
   // --- CÁLCULO DE MÉTRICAS (Dashboard Financiero) ---
   const paidJobs = jobs.filter((j) => j.status === "PAID");
   const cancelledJobs = jobs.filter((j) => j.status === "CANCELLED");
@@ -241,11 +248,22 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
                   {selectedHistoryJob.description}
                 </span>
               </div>
-              <div className="flex justify-between border-t border-slate-700 pt-3">
+              <div className="flex justify-between border-t border-slate-700 pt-3 items-center">
                 <span className="text-slate-400">Profesional asignado:</span>
-                <span className="font-medium text-slate-200">
-                  {selectedHistoryJob.professional_id || "No asignado"}
-                </span>
+                {selectedHistoryJob.professional_id ? (
+                  <button
+                    onClick={() =>
+                      handleOpenProfProfile(selectedHistoryJob.professional_id!)
+                    }
+                    className="font-semibold text-amber-400 hover:text-amber-300 hover:underline transition-all cursor-pointer text-sm bg-amber-400/5 px-2.5 py-1 rounded-md border border-amber-500/20"
+                  >
+                    {selectedHistoryJob.professional_id}
+                  </button>
+                ) : (
+                  <span className="font-medium text-slate-500">
+                    No asignado
+                  </span>
+                )}
               </div>
               <div className="flex justify-between border-t border-slate-700 pt-3">
                 <span className="text-slate-400">Fecha de solicitud:</span>
@@ -278,6 +296,12 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
           </div>
         )}
       </AppModal>
+
+      <ProfessionalProfileModal
+        professionalId={selectedProfId}
+        open={profModalOpen}
+        onOpenChange={setProfModalOpen}
+      />
     </div>
   );
 }

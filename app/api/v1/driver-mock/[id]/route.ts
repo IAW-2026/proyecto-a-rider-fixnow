@@ -2,6 +2,13 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
+// 1. BASE DE DATOS FALSA DE PROFESIONALES (Alineada con Feedback App)
+const MOCK_PROFESSIONALS = [
+  { id: "prof-plomeria-001", service_type: "PLOMERIA" },
+  { id: "prof-electricidad-002", service_type: "ELECTRICIDAD" },
+  { id: "prof-gas-003", service_type: "GAS" },
+];
+
 async function getAuthenticatedClient() {
   const user = await currentUser();
 
@@ -54,9 +61,15 @@ export async function GET(
     return NextResponse.json({ error: "Job not found" }, { status: 404 });
   }
 
+  // Fallback inteligente: si la UI pide el dato y aún no está en la BD, calcula a quién le tocaría
+  const defaultProf =
+    MOCK_PROFESSIONALS.find(
+      (p) => p.service_type === job.service_type.toString().toUpperCase(),
+    )?.id ?? "prof-generico-000";
+
   return NextResponse.json({
     status: job.status,
-    professional_id: job.professional_id ?? "JC-12345",
+    professional_id: job.professional_id ?? defaultProf,
     cancellation_reason: job.cancellation_reason,
     cancellation_payment_required: job.cancellation_payment_required,
     cancelled_at: job.cancelled_at ? job.cancelled_at.toISOString() : null,
@@ -96,6 +109,14 @@ export async function POST(
   const currentStatus = job.status;
   const nextStatus = nextStatusMap[currentStatus] ?? currentStatus;
 
+  // 2. LÓGICA DE ASIGNACIÓN INTELIGENTE
+  const assignedProfessional = MOCK_PROFESSIONALS.find(
+    (p) => p.service_type === job.service_type.toString().toUpperCase(),
+  );
+  const professionalIdToAssign = assignedProfessional
+    ? assignedProfessional.id
+    : "prof-generico-000";
+
   const updatedJob = await prisma.job.update({
     where: { id: job.id },
     data: {
@@ -105,9 +126,10 @@ export async function POST(
         | "IN_PROGRESS"
         | "COMPLETED"
         | "CANCELLED",
+      // Si el trabajo pasa de PENDING a ACCEPTED, le inyectamos el ID que calculamos
       professional_id:
         currentStatus === "PENDING" && !job.professional_id
-          ? "JC-12345"
+          ? professionalIdToAssign
           : job.professional_id,
     },
   });
