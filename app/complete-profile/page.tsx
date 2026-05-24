@@ -13,19 +13,17 @@ export default async function ProfilePage() {
     redirect("/sign-in");
   }
 
-  const profileAddress = user?.unsafeMetadata?.address as string;
-  const profilePhone = user?.unsafeMetadata?.phone as string;
-
-  if (!profileAddress || !profilePhone) {
-    redirect("/complete-profile");
-  }
+  const profileAddress = (user?.unsafeMetadata?.address as string) ?? "";
+  const profilePhone = (user?.unsafeMetadata?.phone as string) ?? "";
 
   return (
-    <div className="flex bg-slate-950 min-h-screen">
-      <main className="ml-64 flex-1 p-12 bg-[#2C446C]">
+    <div className="min-h-screen bg-slate-950">
+      <main className="mx-auto flex min-h-screen w-full max-w-5xl items-center px-6 py-12 sm:px-10 lg:px-12">
         <ProfileClientView
+          initialFullName={user.fullName ?? ""}
           initialAddress={profileAddress}
           initialPhone={profilePhone}
+          mode="setup"
         />
       </main>
     </div>
