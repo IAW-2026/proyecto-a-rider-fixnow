@@ -34,13 +34,15 @@ interface ProfessionalData {
 }
 
 interface ProfessionalProfileModalProps {
-  professionalId: string | null;
+  professionalId?: string | null;
+  professionalName?: string | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
 export function ProfessionalProfileModal({
   professionalId,
+  professionalName,
   open,
   onOpenChange,
 }: ProfessionalProfileModalProps) {
@@ -49,11 +51,13 @@ export function ProfessionalProfileModal({
   const [showReviews, setShowReviews] = useState(false);
 
   useEffect(() => {
-    // Si se abre el modal y hay un ID, vamos a buscar los datos a la API Mock
-    if (open && professionalId) {
+    // Cuando se abre el modal, preferimos buscar por `professionalId`.
+    // Si no hay id pero sí un nombre, mostramos solo el nombre (no intentamos fetch).
+    if (!open) return;
+
+    if (professionalId) {
       setIsLoading(true);
       setShowReviews(false);
-
       fetch(`/api/v1/feedback-mock/professional/${professionalId}`)
         .then((res) => res.json())
         .then((mockData) => {
@@ -61,8 +65,11 @@ export function ProfessionalProfileModal({
         })
         .catch((err) => console.error("Error fetching professional:", err))
         .finally(() => setIsLoading(false));
+    } else {
+      setData(null);
+      setIsLoading(false);
     }
-  }, [open, professionalId]);
+  }, [open, professionalName]);
 
   const renderStars = (rating: number) => {
     return Array.from({ length: 5 }).map((_, i) => (
@@ -79,16 +86,18 @@ export function ProfessionalProfileModal({
       onOpenChange={onOpenChange}
       title="Perfil del Profesional"
       description={
-        data ? `ID de registro: ${data.id}` : "Buscando información..."
+        data
+          ? `ID de registro: ${data.id}`
+          : (professionalName ?? "Buscando información...")
       }
       className="custom-scrollbar w-[min(92vw,28rem)] max-h-[90dvh] overflow-y-auto py-4 border-slate-700 bg-slate-900 text-white z-9999"
     >
-      {isLoading || !data ? (
+      {isLoading ? (
         <div className="flex flex-col items-center justify-center py-12 text-slate-400">
           <Loader2 className="size-8 animate-spin mb-4 text-amber-400" />
           <p>Conectando con el sistema de Feedback...</p>
         </div>
-      ) : (
+      ) : data ? (
         <div className="space-y-6 pt-4">
           {/* Header del Profesional */}
           <div className="flex flex-col items-center text-center">
@@ -185,6 +194,21 @@ export function ProfessionalProfileModal({
               </div>
             )}
           </div>
+        </div>
+      ) : professionalName ? (
+        <div className="space-y-4 pt-4 text-center">
+          <div className="size-20 rounded-full bg-slate-800 border-2 border-slate-700 flex items-center justify-center mb-3 mx-auto">
+            <UserIcon name={professionalName} />
+          </div>
+          <h3 className="text-xl font-bold text-white">{professionalName}</h3>
+          <p className="text-sm text-slate-400">
+            Información limitada (solo nombre disponible)
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+          <Loader2 className="size-8 animate-spin mb-4 text-amber-400" />
+          <p>Conectando con el sistema de Feedback...</p>
         </div>
       )}
     </AppModal>

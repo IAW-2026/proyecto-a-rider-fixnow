@@ -78,7 +78,7 @@ export default async function DashboardPage() {
         ],
       },
       orderBy: { requested_date: { sort: "desc", nulls: "last" } },
-      take: 4,
+      take: 2,
     });
 
     serializedRecentJobs = recentJobs.map((job) => {
@@ -99,6 +99,7 @@ export default async function DashboardPage() {
           ? job.requested_date.toISOString()
           : null,
         professional_id: job.professional_id,
+        cancellation_reason: job.cancellation_reason,
       };
     });
 

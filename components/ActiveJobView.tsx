@@ -5,6 +5,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { AppModal } from "@/components/ui/app-modal";
 import {
+  AlertCircle,
   Check,
   CheckCircle2,
   Clock,
@@ -60,6 +61,8 @@ type DriverMockResponse = {
   cancelled_at?: string | null;
   requires_payment?: boolean;
   penalty_amount?: number;
+  estimated_price?: number;
+  description?: string;
 };
 
 type CancellationReason =
@@ -186,6 +189,8 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     useState<CancellationReason>(DEFAULT_CANCELLATION_REASON);
   const [paymentFlow, setPaymentFlow] = useState<PaymentFlow | null>(null);
   const [profModalOpen, setProfModalOpen] = useState(false);
+  const [isTimeoutModalOpen, setIsTimeoutModalOpen] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     setCurrentJob(job);
@@ -226,6 +231,17 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
 
   const normalizedStatus = currentJob.status.toUpperCase();
 
+  useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    // Si es inmediato y sigue pendiente, disparamos el contador
+    if (normalizedStatus === "PENDING" && currentJob.urgency === "IMMEDIATE") {
+      timeoutId = setTimeout(() => {
+        setIsTimeoutModalOpen(true);
+      }, 15000); // 15 segundos para la demo
+    }
+    return () => clearTimeout(timeoutId);
+  }, [normalizedStatus, currentJob.urgency, retryCount]);
+
   const applyServerState = (updatedData: DriverMockResponse) => {
     const nextStatus = updatedData.status.toUpperCase();
     const nextProfessionalId = updatedData.professional_id;
@@ -240,6 +256,8 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         updatedData.cancellation_payment_required ??
         prev.cancellation_payment_required,
       cancelled_at: updatedData.cancelled_at ?? prev.cancelled_at,
+      estimated_price: updatedData.estimated_price ?? prev.estimated_price,
+      description: updatedData.description ?? prev.description,
     }));
   };
 
@@ -311,9 +329,8 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         : {
             kind: "job",
             amount: currentJob.estimated_price,
-            title: "Redirigiendo a Payments",
-            description:
-              "Estamos simulando la transición a la app de cobros. Cuando la integración esté lista, aquí se abrirá el flujo real de pago.",
+            title: "Resumen de Facturación",
+            description: `Revisá el detalle del servicio antes de proceder al pago.`,
           },
     );
     setIsPaymentModalOpen(true);
@@ -344,7 +361,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
 
       router.refresh();
       window.setTimeout(() => {
-        router.push("/dashboard");
+        router.push(`/dashboard?feedback=${currentJob.id}`);
       }, 1400);
     } catch (error) {
       console.error("Error al simular el pago:", error);
@@ -401,7 +418,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       }
 
       router.refresh();
-      router.push("/dashboard");
+      router.push(`/dashboard?feedback=${currentJob.id}`);
     } catch (error) {
       console.error("Error al cancelar el servicio:", error);
       setSyncError("Error de red al cancelar el servicio.");
@@ -438,6 +455,13 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       )
     : undefined;
 
+  const descriptionParts = currentJob.description.split(
+    "[INFORME DEL PROFESIONAL]:",
+  );
+  const displayDescription = descriptionParts[0].trim();
+  const professionalReport =
+    descriptionParts.length > 1 ? descriptionParts[1].trim() : null;
+
   return (
     <div className="space-y-10">
       <div className="space-y-4">
@@ -449,6 +473,18 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             <p className="mt-1 text-lg text-slate-400">
               Seguimiento en tiempo real de tu servicio
             </p>
+            {normalizedStatus === "PENDING" && (
+              <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 mt-4 max-w-2xl animate-in fade-in duration-300">
+                <AlertCircle className="size-5 text-amber-400 shrink-0" />
+                <p className="text-sm font-medium">
+                  <span className="font-bold">Modo Simulación:</span> Para
+                  evaluar la disponibilidad, si en 15 segundos no utilizas el
+                  botón "Simular avance" para asignar un especialista, se
+                  disparará automáticamente un aviso de tiempo de espera
+                  excedido.
+                </p>
+              </div>
+            )}
             {normalizedStatus === "CANCELLED" && cancellationSummary && (
               <p className="mt-2 max-w-2xl text-sm text-red-500">
                 Motivo de cancelación: {cancellationSummary.title}
@@ -536,9 +572,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                   <h2 className="text-base font-semibold text-white">
                     {serviceLabel}
                   </h2>
-                  <p className="text-sm text-slate-400">
-                    {currentJob.description}
-                  </p>
+                  <p className="text-sm text-slate-400">{displayDescription}</p>
                 </div>
               </div>
               <span className="inline-flex items-center rounded-md bg-amber-400/20 px-2.5 py-1 text-xs font-semibold text-amber-300">
@@ -609,8 +643,9 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                   <AvatarImage
                     src="/avatar-professional.jpg"
                     alt="Profesional asignado"
+                    className="object-contain p-1"
                   />
-                  <AvatarFallback className="bg-slate-700 text-2xl font-semibold text-white">
+                  <AvatarFallback className="h-full w-full bg-slate-700 text-2xl font-semibold text-white">
                     {assignedProfessional
                       ? assignedProfessional.full_name
                           .split(" ")
@@ -708,15 +743,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           )}
 
           <section className="rounded-lg border border-slate-700 bg-slate-800 p-5">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-sm text-slate-400">
-                <Clock className="size-4" />
-                Tiempo estimado restante
-              </div>
-              <span className="font-semibold text-white">~25 min</span>
-            </div>
-
-            <div className="mt-4 flex items-center justify-between border-t border-slate-700 pt-4">
+            <div className=" flex items-center justify-between border-slate-700 ">
               <span className="text-sm text-slate-400">Precio estimado</span>
               <span className="text-xl font-bold text-amber-300">
                 ${currentJob.estimated_price.toLocaleString("es-AR")}
@@ -775,7 +802,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         title="Cancelar servicio"
         description="Elegí el motivo de la cancelación. Se guardará en el historial junto con la fecha y hora exactas."
         icon={<Clock className="size-7 text-amber-300" />}
-        className="max-h-[90vh] w-[92vw] max-w-2xl overflow-y-auto border-slate-700 bg-slate-900 text-white"
+        className="custom-scrollbar max-h-[90vh] w-[92vw] max-w-2xl overflow-y-auto border-slate-700 bg-slate-900 text-white"
         footer={
           <>
             <Button
@@ -851,10 +878,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           }
         }}
         title={paymentFlow?.title ?? "Redirigiendo a Payments"}
-        description={
-          paymentFlow?.description ??
-          "Estamos simulando la transición a la app de cobros. Cuando la integración esté lista, aquí se abrirá el flujo real de pago."
-        }
+        description={paymentFlow?.description ?? ""}
         icon={<Zap className="size-7 text-amber-300" />}
         footer={
           <>
@@ -869,13 +893,99 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             </Button>
             <Button
               type="button"
-              className="flex-1 cursor-pointer bg-amber-400 text-slate-950 hover:bg-amber-300"
+              className="flex-1 cursor-pointer bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold"
               onClick={confirmPayment}
               disabled={isRedirectingToPayments}
             >
-              {isRedirectingToPayments
-                ? "Redirigiendo..."
-                : `Ir a Payments${paymentFlow ? ` ($${paymentFlow.amount.toLocaleString("es-AR")})` : ""}`}
+              {isRedirectingToPayments ? "Redirigiendo..." : `Ir a Payments`}
+            </Button>
+          </>
+        }
+      >
+        {/* --- NUEVO DISEÑO INTERNO DEL MODAL --- */}
+        {paymentFlow?.kind === "job" && (
+          <div className="mt-2 space-y-5 animate-in fade-in duration-300">
+            {/* Tarjeta de Precio Gigante */}
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-amber-500/30 bg-amber-400/10 p-6 shadow-inner">
+              <span className="text-sm font-medium text-amber-200/80 uppercase tracking-wider mb-1">
+                Monto Final a Pagar
+              </span>
+              <span className="text-5xl font-extrabold text-amber-400 tracking-tight">
+                ${paymentFlow.amount.toLocaleString("es-AR")}
+              </span>
+            </div>
+            {/* Separación inteligente de los textos */}
+            <div className="space-y-4 rounded-2xl border border-slate-700 bg-slate-800/50 p-5 text-sm shadow-sm">
+              {/* Caja de la solicitud original */}
+              <div className="space-y-2">
+                <span className="flex items-center gap-2 font-medium text-slate-400">
+                  <MessageCircle className="size-4" /> Tu solicitud original:
+                </span>
+                <p className="rounded-xl border border-slate-700/50 bg-slate-900/50 p-3.5 text-slate-300 leading-relaxed">
+                  {displayDescription}
+                </p>
+              </div>
+
+              {/* Caja destacada del informe del profesional */}
+              {professionalReport && (
+                <div className="space-y-2 pt-2 border-t border-slate-700">
+                  <span className="flex items-center gap-2 font-medium text-amber-400">
+                    <Wrench className="size-4" /> Informe del profesional:
+                  </span>
+                  <p className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3.5 text-amber-100/90 leading-relaxed">
+                    {professionalReport}
+                  </p>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Diseño para cuando es una multa por cancelación */}
+        {paymentFlow?.kind === "penalty" && (
+          <div className="mt-2 flex flex-col items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center animate-in zoom-in-95 duration-300">
+            <span className="mb-2 block text-sm font-semibold uppercase tracking-wider text-red-300/80">
+              Cargo por cancelación
+            </span>
+            <span className="text-5xl font-extrabold tracking-tight text-red-400">
+              ${paymentFlow.amount.toLocaleString("es-AR")}
+            </span>
+          </div>
+        )}
+      </AppModal>
+
+      {/* MODAL DE TIEMPO DE ESPERA EXCEDIDO */}
+      <AppModal
+        open={isTimeoutModalOpen}
+        onOpenChange={setIsTimeoutModalOpen}
+        title="Sin profesionales disponibles"
+        description="Tiempo de espera excedido. En este momento no hay profesionales activos cerca de tu zona."
+        icon={<Clock className="size-7 text-amber-300" />}
+        className="border-slate-700 bg-slate-900 text-white z-9999"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
+              onClick={() => {
+                setIsTimeoutModalOpen(false);
+                // Acá reutilizamos tu lógica de cancelar, seteando la razón:
+                setSelectedCancellationReason("MUCHO_TIEMPO_ESPERA");
+                confirmCancellation();
+              }}
+              disabled={isSyncing}
+            >
+              {isSyncing ? "Cancelando..." : "Cancelar solicitud"}
+            </Button>
+            <Button
+              className="flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300"
+              onClick={() => {
+                setIsTimeoutModalOpen(false);
+                // Si el usuario elige esperar un poco más, le damos otros 15s
+                setRetryCount((prev) => prev + 1);
+              }}
+            >
+              Seguir esperando
             </Button>
           </>
         }
@@ -883,6 +993,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
 
       <ProfessionalProfileModal
         professionalId={currentJob.professional_id}
+        professionalName={assignedProfessional?.full_name ?? null}
         open={profModalOpen}
         onOpenChange={setProfModalOpen}
       />

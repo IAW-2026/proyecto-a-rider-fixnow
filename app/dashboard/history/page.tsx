@@ -56,6 +56,7 @@ export default async function HistoryPage() {
           : null,
         professional_id: job.professional_id,
         cancellation_payment_required: job.cancellation_payment_required,
+        cancellation_reason: job.cancellation_reason,
       };
     });
   }
