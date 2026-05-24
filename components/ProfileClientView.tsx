@@ -15,17 +15,23 @@ import {
 } from "lucide-react";
 
 interface ProfileClientViewProps {
+  initialFullName?: string;
   initialAddress: string;
   initialPhone: string;
+  mode?: "edit" | "setup";
 }
 
 export function ProfileClientView({
+  initialFullName,
   initialAddress,
   initialPhone,
+  mode = "edit",
 }: ProfileClientViewProps) {
   const { user, isLoaded } = useUser();
   const router = useRouter();
+  const isSetupMode = mode === "setup";
 
+  const [fullName, setFullName] = useState(initialFullName ?? "");
   const [address, setAddress] = useState(initialAddress);
   const [phone, setPhone] = useState(initialPhone);
 
@@ -101,6 +107,136 @@ export function ProfileClientView({
       setIsSaving(false);
     }
   };
+
+  const handleCompleteProfile = async () => {
+    if (!fullName.trim()) {
+      setError("Completa tu nombre antes de continuar.");
+      return;
+    }
+
+    if (!address.trim() || !phone.trim()) {
+      setError("Completa dirección y teléfono antes de continuar.");
+      return;
+    }
+
+    setIsSaving(true);
+    setError(null);
+
+    try {
+      const trimmedFullName = fullName.trim();
+      const nameParts = trimmedFullName.split(/\s+/);
+      const firstName = nameParts.shift() ?? "";
+      const lastName = nameParts.join(" ");
+
+      const dataToSave = {
+        fullName: trimmedFullName,
+        address: address.trim(),
+        phone: phone.trim(),
+      };
+
+      const response = await fetch("/api/v1/clients", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(dataToSave),
+      });
+
+      if (!response.ok) throw new Error("Error al guardar en la base de datos");
+
+      await user.update({
+        firstName,
+        lastName,
+        unsafeMetadata: {
+          ...user.unsafeMetadata,
+          fullName: trimmedFullName,
+          address: address.trim(),
+          phone: phone.trim(),
+        },
+      });
+
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (err) {
+      setError("No se pudo completar el perfil. Intenta nuevamente.");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  if (isSetupMode) {
+    return (
+      <div className="mx-auto w-full max-w-2xl space-y-8">
+        <div className="space-y-3 text-center">
+          <h1 className="text-4xl font-extrabold tracking-tighter text-white">
+            Completá tu perfil
+          </h1>
+          <p className="text-base text-slate-300">
+            Necesitamos tu dirección y teléfono para habilitar los servicios.
+          </p>
+        </div>
+
+        <div className="space-y-6 rounded-2xl border border-slate-700 bg-slate-900 p-7 shadow-lg">
+          <div className="space-y-2">
+            <label className="text-xs font-medium uppercase tracking-wider text-slate-500">
+              Nombre Completo
+            </label>
+            <input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              placeholder="Nombre y apellido"
+              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-400"
+            />
+          </div>
+
+          <div className="space-y-4 border-t border-slate-800 pt-6">
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                Dirección de Servicio
+              </label>
+              <input
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Calle, número, barrio"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-400"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-xs font-medium uppercase tracking-wider text-slate-500">
+                Número de Teléfono
+              </label>
+              <input
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                type="tel"
+                placeholder="Ej. 11 1234 5678"
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none transition-colors focus:border-amber-400"
+              />
+            </div>
+
+            <button
+              onClick={handleCompleteProfile}
+              disabled={isSaving}
+              className="flex w-full items-center justify-center rounded-lg bg-amber-400 px-4 py-3 font-semibold text-slate-950 transition-colors hover:bg-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {isSaving ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin" /> Guardando...
+                </span>
+              ) : (
+                "Completar perfil"
+              )}
+            </button>
+          </div>
+        </div>
+
+        {error && (
+          <p className="text-center text-sm font-medium text-red-400">
+            {error}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className=" max-w-3xl mx-auto">
