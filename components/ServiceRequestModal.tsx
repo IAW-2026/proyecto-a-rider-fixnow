@@ -40,6 +40,7 @@ type JobUrgency = "immediate" | "scheduled";
 interface JobRequestPayload {
   service_type: ServiceType;
   description: string;
+  address: string;
   lat: number;
   lng: number;
   urgency: JobUrgency;
@@ -136,6 +137,7 @@ export function ServiceRequestModal({
       const payload = {
         service_type: service,
         description: description.trim(),
+        address: clientAddress,
         lat: lat,
         lng: lng,
         urgency,

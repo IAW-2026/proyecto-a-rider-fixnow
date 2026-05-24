@@ -8,10 +8,10 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const { fullName, address } = await req.json();
+  const { fullName, address, phone } = await req.json();
   const email = user.emailAddresses[0]?.emailAddress;
 
-  if (!email || !fullName || !address) {
+  if (!email || !fullName || !address || !phone) {
     return NextResponse.json(
       { error: "Missing required fields" },
       { status: 400 },
@@ -20,8 +20,8 @@ export async function POST(req: Request) {
 
   const client = await prisma.client.upsert({
     where: { email },
-    update: { full_name: fullName, direction: address },
-    create: { full_name: fullName, email, direction: address },
+    update: { full_name: fullName, direction: address, phone: phone },
+    create: { full_name: fullName, email, direction: address, phone: phone },
   });
 
   return NextResponse.json({ data: client }, { status: 200 });
