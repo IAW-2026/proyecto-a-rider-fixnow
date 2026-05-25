@@ -4,27 +4,25 @@
 // Get a free hosted Postgres database in seconds: `npx create-db`
 
 generator client {
-  provider = "prisma-client"
-  output   = "../app/generated/prisma"
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider = "postgresql"
 }
-
 model Client {
   id        String   @id @default(uuid())
   full_name String
   email     String   @unique
   direction String
-  is_verified Boolean  @default(false)
+  phone     String?
 
   // Relacion: un cliente puede tener muchos jobs 
   jobs      Job[]
 }
 
 model Job {
-  id          String   @id 
+  id          String   @id  @default(uuid())
 
   // Así se relacionan dos tablas dentro de la MISMA base de datos en Prisma:
   client_id   String
@@ -42,7 +40,7 @@ model Job {
   estimated_price Decimal
   cancelled_at DateTime?
   cancellation_reason String?
-
+  cancellation_payment_required Boolean @default(false)
 
 }
 
@@ -61,6 +59,7 @@ enum JobStatus {
   PENDING
   ACCEPTED
   IN_PROGRESS
-  COMPLETED 
+  COMPLETED
+  PAID 
   CANCELLED
 } 
