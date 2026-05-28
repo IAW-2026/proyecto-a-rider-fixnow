@@ -8,6 +8,9 @@ import {
   Receipt,
   XCircle,
   CheckCircle2,
+  CreditCard,
+  ExternalLink,
+  Loader2,
 } from "lucide-react";
 import { AppModal } from "@/components/ui/app-modal";
 import { Button } from "@/components/ui/button";
@@ -28,9 +31,9 @@ interface HistoryClientViewProps {
 }
 
 const getServiceIcon = (type: string) => {
-  if (type === "electricidad")
+  if (type === "ELECTRICIDAD")
     return <Zap className="size-5 text-electrical" />;
-  if (type === "gas") return <Flame className="size-5 text-gas" />;
+  if (type === "GAS") return <Flame className="size-5 text-gas" />;
   return <Droplets className="size-5 text-plumbing" />;
 };
 
@@ -55,11 +58,29 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
   const [selectedHistoryJob, setSelectedHistoryJob] =
     useState<JobSummary | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  const [isRedirectModalOpen, setIsRedirectModalOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+
+  const handleOpenPaymentsDashboard = () => {
+    setIsRedirectModalOpen(true);
+  };
+
+  const confirmRedirectToPayments = () => {
+    setIsRedirecting(true);
+    setTimeout(() => {
+      setIsRedirecting(false);
+      setIsRedirectModalOpen(false);
+      // En la Etapa 3, acá harás un window.open o router.push a la URL de Chiara
+      // window.open("http://localhost:3002/dashboard", "_blank");
+    }, 1500);
+  };
 
   // --- CÁLCULO DE MÉTRICAS (Dashboard Financiero) ---
   const paidJobs = jobs.filter((j) => j.status === "PAID");
   const cancelledJobs = jobs.filter((j) => j.status === "CANCELLED");
-  const totalSpent = paidJobs.reduce(
+  const totalSpent = jobs.reduce(
     (acc, current) => acc + current.estimated_price,
     0,
   );
@@ -71,13 +92,27 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
 
   return (
     <div className="space-y-10">
-      <div>
-        <h1 className="text-3xl font-bold tracking-tight text-white">
-          Mi Historial
-        </h1>
-        <p className="mt-1 text-lg text-slate-400">
-          Resumen de tu actividad y pagos en FixNow
-        </p>
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight text-white">
+            Mi Historial
+          </h1>
+          <p className="mt-1 text-lg text-slate-400">
+            Resumen de tu actividad y pagos en FixNow
+          </p>
+        </div>
+
+        {/* NUEVO BOTÓN DE ACCESO A LA BILLETERA */}
+        <Button
+          onClick={handleOpenPaymentsDashboard}
+          className="flex items-center gap-2 bg-slate-800 text-amber-400 hover:bg-slate-700 hover:text-amber-300 border border-slate-700 shadow-sm transition-all h-11 px-5"
+        >
+          <CreditCard className="size-5" />
+          <span className="cursor-pointer font-semibold text-base">
+            Mi Billetera FixNow
+          </span>
+          <ExternalLink className="size-4 ml-1 opacity-70" />
+        </Button>
       </div>
 
       {/* MÉTRICAS FINANCIERAS */}
@@ -278,6 +313,45 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
           </div>
         )}
       </AppModal>
+
+      {/* MODAL DE SIMULACIÓN DE REDIRECCIÓN A PAYMENTS */}
+      <AppModal
+        open={isRedirectModalOpen}
+        onOpenChange={(open) => {
+          setIsRedirectModalOpen(open);
+          if (!open) setIsRedirecting(false);
+        }}
+        title="Billetera y Facturación"
+        description="Serás redirigido de forma segura a FixNow Payments. Allí podrás ver tu dashboard financiero completo, descargar tus facturas y gestionar tus métodos de pago."
+        icon={<CreditCard className="size-7 text-amber-300" />}
+        className="border-slate-700 bg-slate-900 text-white z-9999"
+        footer={
+          <>
+            <Button
+              variant="outline"
+              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
+              onClick={() => setIsRedirectModalOpen(false)}
+              disabled={isRedirecting}
+            >
+              Cancelar
+            </Button>
+            <Button
+              className="cursor-pointer flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold"
+              onClick={confirmRedirectToPayments}
+              disabled={isRedirecting}
+            >
+              {isRedirecting ? (
+                <>
+                  <Loader2 className="size-4 mr-2 animate-spin" />
+                  Conectando...
+                </>
+              ) : (
+                "Ir a Payments"
+              )}
+            </Button>
+          </>
+        }
+      />
     </div>
   );
 }
