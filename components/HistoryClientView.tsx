@@ -111,10 +111,6 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
     }
   }, [selectedHistoryJob]);
 
-  // Estados Modal Feedback
-  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
-  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
-
   useEffect(() => {
     const feedbackId = searchParams.get("feedback");
     if (feedbackId) {
@@ -454,6 +450,8 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
             </Button>
           </>
         }
+      ></AppModal>
+
       {/* MODAL PERFIL DEL PROFESIONAL */}
       <ProfessionalProfileModal
         professionalId={selectedProfId}
