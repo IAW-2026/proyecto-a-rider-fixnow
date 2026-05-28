@@ -40,6 +40,7 @@ type JobUrgency = "immediate" | "scheduled";
 interface JobRequestPayload {
   service_type: ServiceType;
   description: string;
+  address: string;
   lat: number;
   lng: number;
   urgency: JobUrgency;
@@ -108,16 +109,6 @@ export function ServiceRequestModal({
       return;
     }
 
-    if (urgency === "immediate") {
-      const currentHour = new Date().getHours();
-      if (currentHour < 8 || currentHour >= 18) {
-        setFormError(
-          "Los servicios inmediatos solo están disponibles entre las 08:00hs y las 18:00hs.",
-        );
-        return;
-      }
-    }
-
     if (urgency === "scheduled") {
       if (!scheduledDateTime) {
         setFormError(
@@ -134,13 +125,6 @@ export function ServiceRequestModal({
         );
         return;
       }
-      const hour = selected.getHours();
-      if (hour < 8 || hour >= 18) {
-        setFormError(
-          "Los servicios programados deben ser entre las 08:00hs y las 18:00hs.",
-        );
-        return;
-      }
     }
 
     if (lat === null || lng === null) {
@@ -153,6 +137,7 @@ export function ServiceRequestModal({
       const payload = {
         service_type: service,
         description: description.trim(),
+        address: clientAddress,
         lat: lat,
         lng: lng,
         urgency,
@@ -176,6 +161,8 @@ export function ServiceRequestModal({
         return;
       }
 
+      const selectedUrgency = urgency;
+
       setDescription("");
       setUrgency("immediate");
       setScheduledDateTime("");
@@ -183,7 +170,12 @@ export function ServiceRequestModal({
 
       router.refresh();
 
-      router.push("/dashboard/active");
+      if (selectedUrgency === "scheduled") {
+        router.push("/dashboard/scheduled"); // Al nuevo panel de turnos
+      } else {
+        router.push("/dashboard/active"); // Al seguimiento en vivo
+      }
+
       onOpenChange(false);
     } catch (err) {
       setFormError("Error de red, intenta nuevamente.");

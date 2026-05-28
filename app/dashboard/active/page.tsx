@@ -4,129 +4,114 @@ import { currentUser } from "@clerk/nextjs/server";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
+import { Clock } from "lucide-react";
 
 export const metadata = {
   title: "Trabajo Activo - FixNow",
 };
 
-export default async function ActivePage() {
+export default async function ActiveJobPage() {
   const user = await currentUser();
-
-  if (!user) {
-    redirect("/sign-in");
-  }
+  if (!user) redirect("/sign-in");
 
   const profileAddress = user?.unsafeMetadata?.address;
-
-  if (!profileAddress) {
-    redirect("/complete-profile");
-  }
-
+  const profilePhone = user?.unsafeMetadata?.phone;
   const email = user.emailAddresses[0]?.emailAddress;
 
-  if (!email) {
-    return (
-      <div className="flex">
-        <AppSidebar currentView="active" />
-        <main className="ml-64 flex min-h-screen w-full flex-1 items-center justify-center bg-[#2C446C] p-12">
-          <div className="max-w-md rounded-lg border border-slate-700 bg-slate-800 p-8 text-center shadow-xl">
-            <h2 className="text-2xl font-bold text-white">
-              No pudimos identificar tu cuenta
-            </h2>
-            <p className="mt-4 text-slate-400">
-              Verifica tu sesión e intenta nuevamente.
-            </p>
-          </div>
-        </main>
-      </div>
-    );
-  }
+  if (!profileAddress || !profilePhone) redirect("/complete-profile");
 
-  const client = await prisma.client.findUnique({
-    where: { email },
+  const dbClient = await prisma.client.findUnique({
+    where: { email: email as string },
   });
 
-  // 1- Buscamos el ultimo job activo de este cliente
-  const activeJob = await prisma.job.findFirst({
-    where: client
-      ? {
-          client_id: client.id,
-          status: {
-            in: ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED"],
+  let currentActiveJob = null;
+
+  if (dbClient) {
+    // APLICAMOS EL FILTRO ESTRICTO: Solo trabajos que requieran seguimiento EN VIVO ahora
+    currentActiveJob = await prisma.job.findFirst({
+      where: {
+        client_id: dbClient.id,
+        OR: [
+          // A: Emergencias inmediatas activas
+          {
+            urgency: "IMMEDIATE",
+            status: { in: ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED"] },
           },
-        }
-      : undefined,
-    orderBy: {
-      id: "desc", //Traemos el ultimo job creado
-    },
-  });
-
-  const penaltyJob = activeJob
-    ? null
-    : await prisma.job.findFirst({
-        where: client
-          ? {
-              client_id: client.id,
-              status: "CANCELLED",
-              cancellation_payment_required: true,
-            }
-          : undefined,
-        orderBy: {
-          id: "desc",
-        },
-      });
-
-  const visibleJob = activeJob ?? penaltyJob;
-
-  // 2- Si el cliente no tiene ningun trabajo activo, mostramos un cartel y boton para ir al dashboard y crear uno
-  if (!visibleJob) {
-    return (
-      <div className="flex">
-        <AppSidebar currentView="active" />
-        <main className="ml-64 min-h-screen w-full flex-1 bg-[#2C446C] p-12 flex items-center justify-center">
-          <div className="max-w-md rounded-lg border border-slate-700 bg-slate-800 p-8 text-center shadow-xl">
-            <h2 className="text-2xl font-bold text-white">
-              No tienes trabajos activos
-            </h2>
-            <p className="mt-4 text-slate-400">
-              Parece que no tienes ningún trabajo activo en este momento.
-            </p>
-            <Link
-              href="/dashboard"
-              className="mt-8 inline-block rounded-lg bg-amber-400 px-6 py-2 font-semibold text-slate-950 transition hover:bg-amber-300"
-            >
-              Ir al Dashboard
-            </Link>
-          </div>
-        </main>
-      </div>
-    );
+          // B: Turnos programados que YA empezaron (el profesional llegó o está cobrando)
+          {
+            urgency: "SCHEDULED",
+            status: { in: ["IN_PROGRESS", "COMPLETED"] },
+          },
+          // C: Cancelaciones que todavía deben la multa
+          { status: "CANCELLED", cancellation_payment_required: true },
+        ],
+      },
+      orderBy: { requested_date: { sort: "desc", nulls: "last" } },
+    });
   }
 
-  // 3- Serializamos los datos (Prisma guarda numeros decimales raros que TS
-  // a veces no puede pasar directo a componentes cliente)
-  const serializedJob = {
-    id: visibleJob.id,
-    service_type: visibleJob.service_type,
-    description: visibleJob.description,
-    status: visibleJob.status,
-    cancellation_reason: visibleJob.cancellation_reason,
-    cancellation_payment_required: visibleJob.cancellation_payment_required,
-    cancelled_at: visibleJob.cancelled_at
-      ? visibleJob.cancelled_at.toISOString()
-      : null,
-    urgency: visibleJob.urgency,
-    lat: visibleJob.lat,
-    lng: visibleJob.lng,
-    estimated_price: Number(visibleJob.estimated_price),
-    professional_id: visibleJob.professional_id,
-  };
+  // Serializamos los datos para el componente cliente de la misma forma que antes
+  const serializedJob = currentActiveJob
+    ? {
+        id: currentActiveJob.id,
+        service_type: currentActiveJob.service_type,
+        description: currentActiveJob.description,
+        status: currentActiveJob.status,
+        cancellation_reason: currentActiveJob.cancellation_reason,
+        cancellation_payment_required:
+          currentActiveJob.cancellation_payment_required,
+        cancelled_at: currentActiveJob.cancelled_at
+          ? currentActiveJob.cancelled_at.toISOString()
+          : null,
+        urgency: currentActiveJob.urgency,
+        lat: currentActiveJob.lat,
+        lng: currentActiveJob.lng,
+        estimated_price: Number(currentActiveJob.estimated_price),
+        professional_id: currentActiveJob.professional_id,
+      }
+    : null;
 
   return (
-    <div className="flex">
+    <div className="flex bg-slate-950 min-h-screen">
       <AppSidebar currentView="active" />
-      <main className="ml-64 min-h-screen w-full flex-1 bg-[#2C446C] p-12">
-        <ActiveJobView job={serializedJob} />
+      <main className="ml-64 flex-1 p-12 bg-[#2C446C] text-white">
+        {/* LÓGICA CONDICIONAL: Si no hay un trabajo que requiera atención inmediata, mostramos un estado vacío limpio */}
+        {!serializedJob ? (
+          <div className="space-y-4">
+            <h1 className="text-3xl font-bold tracking-tight">
+              Trabajo Activo
+            </h1>
+            <p className="mt-1 text-lg text-slate-400">
+              Seguimiento en tiempo real de tu servicio
+            </p>
+
+            <div className="rounded-lg border border-slate-700 bg-slate-800 p-12 text-center mt-10">
+              <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-slate-700 text-slate-400 mb-4">
+                <Clock className="size-6" />
+              </div>
+              <h3 className="text-lg font-semibold text-white mb-1">
+                No tienes ningún servicio en curso
+              </h3>
+              <p className="text-slate-400 max-w-md mx-auto">
+                Las solicitudes inmediatas aparecerán aquí para su seguimiento.
+                Los turnos agendados para días futuros se encuentran en la
+                sección de{" "}
+                <span className="text-amber-400 font-medium">
+                  <a
+                    href="/dashboard/scheduled"
+                    className="text-amber-400 hover:text-amber-300"
+                  >
+                    Servicios Programados
+                  </a>
+                </span>
+                .
+              </p>
+            </div>
+          </div>
+        ) : (
+          /* Si hay una urgencia o un turno en proceso real, renderizamos la vista del mapa */
+          <ActiveJobView job={serializedJob as any} />
+        )}
       </main>
     </div>
   );

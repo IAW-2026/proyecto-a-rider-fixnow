@@ -15,7 +15,7 @@ model Client {
   full_name String
   email     String   @unique
   direction String
-  is_verified Boolean  @default(false) 
+  phone     String?
 
   // Relacion: un cliente puede tener muchos jobs 
   jobs      Job[]
@@ -41,7 +41,6 @@ model Job {
   cancelled_at DateTime?
   cancellation_reason String?
   cancellation_payment_required Boolean @default(false)
-
 
 }
 

@@ -54,10 +54,15 @@ export async function POST(
     );
   }
 
+  const isCancelled = job.status === "CANCELLED";
+
   // Actualizamos a PAID
   const updatedJob = await prisma.job.update({
     where: { id: job.id },
-    data: { status: "PAID", cancellation_payment_required: false },
+    data: {
+      status: isCancelled ? "CANCELLED" : "PAID",
+      cancellation_payment_required: false,
+    },
   });
 
   // IMPORTANTE: Limpiamos la caché de Next.js para que el Dashboard re-lea la base de datos

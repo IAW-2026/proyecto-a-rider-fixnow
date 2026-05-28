@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useEffect } from "react";
 import { ServiceCard, type ServiceType } from "./ServiceCard";
 import { ServiceRequestModal } from "./ServiceRequestModal";
 import {
@@ -14,6 +15,9 @@ import {
 import Link from "next/link";
 import { AppModal } from "@/components/ui/app-modal";
 import { Button } from "@/components/ui/button";
+import { useSearchParams, useRouter } from "next/navigation";
+import { FeedbackModal } from "@/components/FeedbackModal";
+import { ProfessionalProfileModal } from "./ProfessionalProfileModal";
 
 type JobSummary = {
   id: string;
@@ -24,6 +28,8 @@ type JobSummary = {
   requested_date: string | null;
   cancellation_payment_required?: boolean;
   professional_id: string | null;
+  professional_name?: string | null;
+  cancellation_reason?: string | null;
 };
 
 interface HomeViewProps {
@@ -89,6 +95,8 @@ export function HomeView({
   recentJobs = [],
   activeJob = null,
 }: HomeViewProps) {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [selectedService, setSelectedService] = useState<ServiceType | null>(
     null,
   );
@@ -97,6 +105,41 @@ export function HomeView({
   const [selectedHistoryJob, setSelectedHistoryJob] =
     useState<JobSummary | null>(null);
   const [detailsModalOpen, setDetailsModalOpen] = useState(false);
+  const [profModalOpen, setProfModalOpen] = useState(false);
+  const [selectedProfId, setSelectedProfId] = useState<string | null>(null);
+  const [feedbackModalOpen, setFeedbackModalOpen] = useState(false);
+  const [feedbackJobId, setFeedbackJobId] = useState<string | null>(null);
+  const [modalProfName, setModalProfName] = useState<string>("");
+  const [isLoadingProfName, setIsLoadingProfName] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (selectedHistoryJob?.professional_id) {
+      setIsLoadingProfName(true);
+      setModalProfName("");
+
+      fetch(
+        `/api/v1/feedback-mock/professional/${selectedHistoryJob.professional_id}`,
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          // Tomamos el nombre real que viene de la base de datos/mock del profesional
+          setModalProfName(data.full_name || "Profesional Asignado");
+        })
+        .catch(() => {
+          setModalProfName("Profesional Asignado");
+        })
+        .finally(() => setIsLoadingProfName(false));
+    }
+  }, [selectedHistoryJob]);
+
+  useEffect(() => {
+    const feedbackId = searchParams.get("feedback");
+    if (feedbackId) {
+      setFeedbackJobId(feedbackId);
+      setFeedbackModalOpen(true);
+      router.replace("/dashboard");
+    }
+  }, [searchParams, router]);
 
   const handleServiceClick = (service: ServiceType) => {
     // EL BLOQUEO: Si hay un trabajo activo, no abrimos el modal
@@ -123,6 +166,14 @@ export function HomeView({
   const handleOpenJobDetails = (job: JobSummary) => {
     setSelectedHistoryJob(job);
     setDetailsModalOpen(true);
+  };
+
+  const handleOpenProfProfile = (
+    profId: string | null,
+    profName?: string | null,
+  ) => {
+    setSelectedProfId(profId ?? null);
+    setProfModalOpen(true);
   };
 
   let activeJobButtonText = "Seguimiento en vivo";
@@ -173,7 +224,7 @@ export function HomeView({
         <ServiceCard service="gas" onClick={() => handleServiceClick("gas")} />
       </div>
 
-      {/* NUEVA SECCIÓN: TRABAJO ACTIVO (Entre las cards y el historial) */}
+      {/* TRABAJO ACTIVO (Entre las cards y el historial) */}
       {activeJob && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-white">Trabajo en curso</h2>
@@ -191,7 +242,9 @@ export function HomeView({
                     {getStatusBadge(activeJob.status)}
                   </div>
                   <p className="mt-1 text-sm text-slate-300">
-                    {activeJob.description}
+                    {activeJob.description
+                      .split("[INFORME DEL PROFESIONAL]:")[0]
+                      .trim()}
                   </p>
                 </div>
               </div>
@@ -239,7 +292,9 @@ export function HomeView({
                           className="line-clamp-1 text-sm text-slate-400"
                           title={job.description}
                         >
-                          {job.description}
+                          {job.description
+                            .split("[INFORME DEL PROFESIONAL]:")[0]
+                            .trim()}
                         </p>
                       </div>
                     </div>
@@ -251,7 +306,7 @@ export function HomeView({
                     <div className="mt-4 text-xs text-slate-400">
                       Profesional:{" "}
                       <span className="font-medium text-slate-300">
-                        {job.professional_id}
+                        {job.professional_name ?? job.professional_id}
                       </span>
                     </div>
                   )}
@@ -297,7 +352,7 @@ export function HomeView({
         description={
           selectedHistoryJob ? `ID de solicitud: ${selectedHistoryJob.id}` : ""
         }
-        className="max-w-lg border-slate-700 bg-slate-900 text-white"
+        className="max-w-lg border-slate-700 bg-slate-900 text-white py-2 z-9999"
         footer={
           <div className="flex w-full gap-3">
             <Button
@@ -307,9 +362,18 @@ export function HomeView({
             >
               Cerrar
             </Button>
+            {/* BOTÓN CONECTADO AL FEEDBACK MANUAL */}
             <Button
               className="flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300 disabled:opacity-50"
-              disabled // Deshabilitado hasta que Lautaro y vos armen estas features
+              disabled={
+                selectedHistoryJob?.status === "PENDING" ||
+                !selectedHistoryJob?.professional_id
+              }
+              onClick={() => {
+                setDetailsModalOpen(false);
+                setFeedbackJobId(selectedHistoryJob?.id ?? null);
+                setTimeout(() => setFeedbackModalOpen(true), 300); // Pequeño delay para que cierre el primero
+              }}
             >
               Dejar Feedback
             </Button>
@@ -322,7 +386,7 @@ export function HomeView({
               <div className="flex size-14 mt-1 items-center justify-center rounded-lg bg-slate-900">
                 {getServiceIcon(selectedHistoryJob.service_type)}
               </div>
-              <div className="grid gap-1 grid-cols-1n">
+              <div className="grid gap-1 grid-cols-1 min-w-0">
                 <h4 className="font-semibold text-white capitalize">
                   {selectedHistoryJob.service_type}
                 </h4>
@@ -336,15 +400,52 @@ export function HomeView({
               <div>
                 <span className="block text-slate-400">Descripción:</span>
                 <span className="font-medium text-slate-200">
-                  {selectedHistoryJob.description}
+                  {selectedHistoryJob.description
+                    .split("[INFORME DEL PROFESIONAL]:")[0]
+                    .trim()}
                 </span>
               </div>
-              <div className="flex justify-between border-t border-slate-700 pt-3">
+
+              <div className="flex justify-between border-t border-slate-700 pt-3 items-center">
                 <span className="text-slate-400">Profesional asignado:</span>
-                <span className="font-medium text-slate-200">
-                  {selectedHistoryJob.professional_id || "No asignado"}
-                </span>
+                {selectedHistoryJob.professional_id ? (
+                  <button
+                    onClick={() =>
+                      handleOpenProfProfile(selectedHistoryJob.professional_id!)
+                    }
+                    className="font-semibold text-amber-400 hover:text-amber-300 hover:underline transition-all cursor-pointer text-sm bg-amber-400/5 px-2.5 py-1 rounded-md border border-amber-500/20 flex items-center gap-2"
+                  >
+                    {isLoadingProfName ? (
+                      <span className="text-slate-500 animate-pulse">
+                        Cargando nombre...
+                      </span>
+                    ) : (
+                      modalProfName || selectedHistoryJob.professional_id
+                    )}
+                  </button>
+                ) : (
+                  <span className="font-medium text-slate-500">
+                    No asignado
+                  </span>
+                )}
               </div>
+
+              {/* MOSTRAR MOTIVO SI ESTÁ CANCELADO */}
+              {selectedHistoryJob.status === "CANCELLED" &&
+                selectedHistoryJob.cancellation_reason && (
+                  <div className="flex flex-col border-t border-slate-700 pt-3">
+                    <span className="text-slate-400 mb-1">
+                      Motivo de cancelación:
+                    </span>
+                    <span className="font-medium text-red-400 bg-red-400/10 p-2 rounded border border-red-400/20">
+                      {selectedHistoryJob.cancellation_reason.replace(
+                        /_/g,
+                        " ",
+                      )}
+                    </span>
+                  </div>
+                )}
+
               <div className="flex justify-between border-t border-slate-700 pt-3">
                 <span className="text-slate-400">Fecha de solicitud:</span>
                 <span className="font-medium text-slate-200">
@@ -352,27 +453,37 @@ export function HomeView({
                     ? new Date(
                         selectedHistoryJob.requested_date,
                       ).toLocaleString("es-AR")
-                    : "Fecha desconocida"}
+                    : "Desconocida"}
                 </span>
               </div>
+
               <div className="flex justify-between border-t border-slate-700 pt-3">
-                <span className="text-slate-400">Monto total abonado:</span>
+                <span className="text-slate-400">Monto final:</span>
                 <span className="font-bold text-amber-400">
                   ${selectedHistoryJob.estimated_price.toLocaleString("es-AR")}
                 </span>
               </div>
             </div>
-
-            <Button
-              variant="link"
-              className="w-full text-sm text-slate-400 hover:text-white"
-              disabled
-            >
-              Ver comprobante de pago
-            </Button>
           </div>
         )}
       </AppModal>
+
+      <ProfessionalProfileModal
+        professionalId={selectedProfId}
+        open={profModalOpen}
+        onOpenChange={setProfModalOpen}
+      />
+
+      {/* RENDERIZAR EL MODAL DE FEEDBACK */}
+      <FeedbackModal
+        jobId={feedbackJobId}
+        professionalName={
+          recentJobs.find((j) => j.id === feedbackJobId)?.professional_name ??
+          null
+        }
+        open={feedbackModalOpen}
+        onOpenChange={setFeedbackModalOpen}
+      />
     </div>
   );
 }
