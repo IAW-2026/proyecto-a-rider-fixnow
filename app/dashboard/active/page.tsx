@@ -56,6 +56,7 @@ export default async function ActiveJobPage() {
         id: currentActiveJob.id,
         service_type: currentActiveJob.service_type,
         description: currentActiveJob.description,
+        direction: currentActiveJob.direction,
         status: currentActiveJob.status,
         cancellation_reason: currentActiveJob.cancellation_reason,
         cancellation_payment_required:

@@ -39,6 +39,7 @@ type ActiveJob = {
   id: string;
   service_type: string;
   description: string;
+  direction: string | null;
   status: string;
   cancellation_reason: string | null;
   cancellation_payment_required: boolean;
@@ -65,6 +66,7 @@ type DriverMockResponse = {
   estimated_price?: number;
   description?: string;
   service_type?: string;
+  direction?: string | null;
   lat?: number;
   lng?: number;
 };
@@ -270,6 +272,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       estimated_price: updatedData.estimated_price ?? prev.estimated_price,
       description: updatedData.description ?? prev.description,
       service_type: updatedData.service_type ?? prev.service_type,
+      direction: updatedData.direction ?? prev.direction,
       lat: updatedData.lat ?? prev.lat,
       lng: updatedData.lng ?? prev.lng,
     }));
@@ -1080,6 +1083,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         jobId={currentJob.id}
         initialService={currentJob.service_type}
         initialDescription={currentJob.description}
+        initialDirection={currentJob.direction}
         onSuccess={(updatedData) => {
           applyServerState(updatedData);
         }}

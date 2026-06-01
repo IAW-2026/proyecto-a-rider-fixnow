@@ -188,9 +188,13 @@ export async function PATCH(
     where: { id: job.id },
     data: {
       service_type: body.service_type ?? job.service_type,
+      direction: body.direction ?? job.direction,
       description: body.description ?? job.description,
       lat: body.lat ?? job.lat,
       lng: body.lng ?? job.lng,
+      requested_date: body.requested_date
+        ? new Date(body.requested_date)
+        : job.requested_date,
     },
   });
 
@@ -200,5 +204,6 @@ export async function PATCH(
     description: updatedJob.description,
     lat: updatedJob.lat,
     lng: updatedJob.lng,
+    requested_date: updatedJob.requested_date,
   });
 }

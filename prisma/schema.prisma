@@ -16,7 +16,6 @@ model Client {
   email     String   @unique
   direction String
   phone     String?
-
   // Relacion: un cliente puede tener muchos jobs 
   jobs      Job[]
 }
@@ -24,18 +23,17 @@ model Client {
 model Job {
   id          String   @id  @default(uuid())
 
-  // Así se relacionan dos tablas dentro de la MISMA base de datos en Prisma:
   client_id   String
   client      Client   @relation(fields: [client_id], references: [id])
 
   service_type ServiceType
   description String
-  //location    String // En realidad es Point(lat/lng), pero no Prisma no tiene Point
+  direction    String?
   lat         Float
   lng         Float
-  requested_date DateTime? //Solo para Jobs programados, pero no se puede usar como registro para cuando se completa? 
+  requested_date DateTime? 
   urgency     JobUrgency
-  status      JobStatus @default(PENDING) //Al crear un nuevo Job, siempre va a empezar pending
+  status      JobStatus @default(PENDING) 
   professional_id String? 
   estimated_price Decimal
   cancelled_at DateTime?

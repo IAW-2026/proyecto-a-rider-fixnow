@@ -10,19 +10,23 @@ import {
   Flame,
   AlertCircle,
   CheckCircle2,
+  LocateIcon,
 } from "lucide-react";
 import { AppModal } from "@/components/ui/app-modal";
 import { Button } from "@/components/ui/button";
+import { EditJobModal } from "@/components/EditJobModal";
 
 // --- TIPOS DE DATOS ---
 type ScheduledJob = {
   id: string;
   service_type: string;
   description: string;
+  direction: string;
   status: string;
   estimated_price: number;
   requested_date: string | null;
   professional_id: string | null;
+  cancellation_payment_required?: boolean;
 };
 
 interface ScheduledJobsViewProps {
@@ -110,9 +114,10 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentFlow, setPaymentFlow] = useState<PaymentFlow | null>(null);
 
-  // --------------------------------------------------------
+  // Estado para el Modal de Edición de Trabajo
+  const [jobToEdit, setJobToEdit] = useState<ScheduledJob | null>(null);
+
   // LÓGICA DE SIMULACIÓN (Demos)
-  // --------------------------------------------------------
 
   // 1. Un profesional toma el turno
   const simulateAccept = async (id: string) => {
@@ -147,9 +152,19 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
     }
   };
 
-  // --------------------------------------------------------
   // LÓGICA DE CANCELACIÓN MANUAL Y MULTAS
-  // --------------------------------------------------------
+
+  const handlePayPenaltyClick = (job: ScheduledJob) => {
+    setSelectedJobId(job.id);
+    setPaymentFlow({
+      kind: "penalty",
+      amount: Math.max(1000, Math.round(job.estimated_price * 0.2)),
+      title: "Pago de multa",
+      description:
+        "La cancelación genera una multa porque el trabajo ya estaba asignado a un profesional.",
+    });
+    setIsPaymentModalOpen(true);
+  };
 
   const handleCancelClick = (id: string) => {
     setSelectedJobId(id);
@@ -183,6 +198,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
             "La cancelación genera una multa porque el trabajo ya estaba asignado a un profesional.",
         });
         setIsPaymentModalOpen(true);
+        router.refresh();
       } else {
         // Si estaba PENDING, se cancela gratis y desaparece.
         router.refresh();
@@ -276,6 +292,34 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
               );
             }
 
+            // ESTADO ESPECIAL: El trabajo tiene una multa pendiente
+            if (
+              job.status === "CANCELLED" &&
+              job.cancellation_payment_required
+            ) {
+              return (
+                <div
+                  key={job.id}
+                  className="flex flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center shadow-sm animate-in fade-in duration-300 h-full"
+                >
+                  <AlertCircle className="size-10 text-red-400 mb-3" />
+                  <h3 className="font-semibold text-white mb-1">
+                    Multa Pendiente
+                  </h3>
+                  <p className="text-sm text-red-200 mb-6 max-w-sm">
+                    Cancelaste este turno cuando ya había un profesional
+                    asignado. Debés abonar el cargo por cancelación.
+                  </p>
+                  <Button
+                    onClick={() => handlePayPenaltyClick(job)}
+                    className="bg-red-500 text-white hover:bg-red-600 px-8 transition-all"
+                  >
+                    Abonar Multa
+                  </Button>
+                </div>
+              );
+            }
+
             // TARJETA NORMAL
             return (
               <div
@@ -330,25 +374,29 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
                         hs
                       </span>
                     </div>
+                    <div className="flex items-center gap-2 text-sm text-slate-300">
+                      <LocateIcon className="size-4 text-slate-400" />
+                      <span>{job.direction || "No definida"}</span>
+                    </div>
                   </div>
-                </div>
 
-                <div className="mt-6 flex flex-col gap-4 border-t border-slate-700 pt-4">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-slate-500">
-                      Presupuesto estimado
-                    </span>
-                    <span className="text-lg font-bold text-amber-300">
-                      ${job.estimated_price.toLocaleString("es-AR")}
-                    </span>
+                  <div className="mt-6 flex flex-col gap-4 border-t border-slate-700 pt-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs text-slate-500">
+                        Presupuesto estimado
+                      </span>
+                      <span className="text-lg font-bold text-amber-300">
+                        ${job.estimated_price.toLocaleString("es-AR")}
+                      </span>
+                    </div>
                   </div>
 
                   {/* BOTONERA DE CONTROL Y SIMULACIÓN */}
-                  <div className="flex flex-wrap gap-2 justify-end">
+                  <div className="flex flex-col gap-2 ">
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-red-500/30 text-red-400 hover:bg-red-500/10 flex-1 sm:flex-none"
+                      className="bg-red-500 border-red-500/30 text-white hover:bg-red-500/50 flex-1 sm:flex-none"
                       onClick={() => handleCancelClick(job.id)}
                       disabled={isSyncing}
                     >
@@ -359,18 +407,30 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10 flex-1 sm:flex-none"
+                        className="bg-slate-400 border-slate-500/50 text-white hover:bg-slate-500/50 flex-1 sm:flex-none"
+                        onClick={() => setJobToEdit(job)}
+                        disabled={isSyncing}
+                      >
+                        Editar Turno
+                      </Button>
+                    )}
+
+                    {job.status === "PENDING" && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="bg-blue-500 border-blue-500/50 text-white hover:bg-blue-500/50 flex-1 sm:flex-none"
                         onClick={() => simulateAccept(job.id)}
                         disabled={isSyncing}
                       >
-                        Simular: Asignar Prof.
+                        Simular: Asignar Profesional
                       </Button>
                     )}
 
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-emerald-500/50 text-emerald-400 hover:bg-emerald-500/10 flex-1 sm:flex-none bg-emerald-500/5"
+                      className="bg-emerald-500 border-emerald-500/50 text-white hover:bg-emerald-500/50 flex-1 sm:flex-none"
                       onClick={() => simulateTimeArrived(job.id, job.status)}
                       disabled={isSyncing}
                     >
@@ -383,10 +443,6 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
           })}
         </div>
       )}
-
-      {/* ---------------------------------------------------- */}
-      {/* MODALES REUTILIZADOS DE ACTIVE JOB                   */}
-      {/* ---------------------------------------------------- */}
 
       {/* 1. Modal de Cancelación Manual */}
       <AppModal
@@ -478,6 +534,26 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
           </>
         }
       />
+
+      {/* 3. Modal de Edición de Turno */}
+      {jobToEdit && (
+        <EditJobModal
+          open={!!jobToEdit}
+          onOpenChange={(open) => {
+            if (!open) setJobToEdit(null);
+          }}
+          jobId={jobToEdit.id}
+          initialService={jobToEdit.service_type}
+          initialDescription={jobToEdit.description}
+          initialDirection={jobToEdit.direction}
+          isScheduled={true}
+          initialRequestedDate={jobToEdit.requested_date}
+          onSuccess={(updatedData) => {
+            router.refresh();
+            setJobToEdit(null);
+          }}
+        />
+      )}
     </div>
   );
 }

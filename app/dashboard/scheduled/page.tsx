@@ -30,9 +30,12 @@ export default async function ScheduledPage() {
       where: {
         client_id: dbClient.id,
         urgency: "SCHEDULED", // Filtramos por urgencia programada
-        status: {
-          in: ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED"], // Que no estén cerrados
-        },
+        OR: [
+          {
+            status: { in: ["PENDING", "ACCEPTED", "IN_PROGRESS", "COMPLETED"] },
+          }, // Activos
+          { status: "CANCELLED", cancellation_payment_required: true }, // Multas pendientes
+        ],
       },
       orderBy: { requested_date: { sort: "asc", nulls: "last" } }, // Los más próximos primero
     });
@@ -41,12 +44,14 @@ export default async function ScheduledPage() {
       id: job.id,
       service_type: job.service_type,
       description: job.description,
+      direction: job.direction ?? dbClient.direction,
       status: job.status,
       estimated_price: Number(job.estimated_price),
       requested_date: job.requested_date
         ? job.requested_date.toISOString()
         : null,
       professional_id: job.professional_id,
+      cancellation_payment_required: job.cancellation_payment_required,
     }));
   }
 

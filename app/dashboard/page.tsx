@@ -28,11 +28,11 @@ export default async function DashboardPage() {
     where: { email: email as string },
   });
 
-  let serializedActiveJob: any = null;
+  let serializedActiveJobs: any[] = [];
   let serializedRecentJobs: any[] = [];
 
   if (dbClient) {
-    const activeJobRaw = await prisma.job.findFirst({
+    const activeJobsRaw = await prisma.job.findMany({
       where: {
         client_id: dbClient.id,
         OR: [
@@ -53,21 +53,18 @@ export default async function DashboardPage() {
       orderBy: { requested_date: { sort: "desc", nulls: "last" } },
     });
 
-    if (activeJobRaw) {
-      serializedActiveJob = {
-        id: activeJobRaw.id,
-        service_type: activeJobRaw.service_type,
-        description: activeJobRaw.description,
-        status: activeJobRaw.status,
-        estimated_price: Number(activeJobRaw.estimated_price),
-        requested_date: activeJobRaw.requested_date
-          ? activeJobRaw.requested_date.toISOString()
-          : null,
-        cancellation_payment_required:
-          activeJobRaw.cancellation_payment_required,
-        professional_id: activeJobRaw.professional_id,
-      };
-    }
+    serializedActiveJobs = activeJobsRaw.map((activeJobRaw) => ({
+      id: activeJobRaw.id,
+      service_type: activeJobRaw.service_type,
+      description: activeJobRaw.description,
+      status: activeJobRaw.status,
+      estimated_price: Number(activeJobRaw.estimated_price),
+      requested_date: activeJobRaw.requested_date
+        ? activeJobRaw.requested_date.toISOString()
+        : null,
+      cancellation_payment_required: activeJobRaw.cancellation_payment_required,
+      professional_id: activeJobRaw.professional_id,
+    }));
 
     const recentJobs = await prisma.job.findMany({
       where: {
@@ -111,7 +108,7 @@ export default async function DashboardPage() {
             userName={userFullName}
             address={profileAddress as string}
             recentJobs={serializedRecentJobs}
-            activeJob={serializedActiveJob}
+            activeJobs={serializedActiveJobs}
           />
         </main>
       </div>
