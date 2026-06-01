@@ -80,18 +80,28 @@ export default async function DashboardPage() {
 
     serializedRecentJobs = recentJobs.map((job) => {
       const isCancelled = job.status === "CANCELLED";
-      const hadPenalty = isCancelled && job.professional_id !== null;
+      const isProfessionalCancellation =
+        job.cancellation_reason === "CANCELADO_POR_PROFESIONAL";
+
+      //Hay multa si se canceló, había profesional y la culpa NO fue del profesional
+      const hadPenalty =
+        isCancelled &&
+        job.professional_id !== null &&
+        !isProfessionalCancellation;
+
+      // El servidor calcula el precio final
+      const finalPrice = isCancelled
+        ? hadPenalty
+          ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
+          : 0
+        : Number(job.estimated_price);
 
       return {
         id: job.id,
         service_type: job.service_type,
         description: job.description,
         status: job.status,
-        estimated_price: isCancelled
-          ? hadPenalty
-            ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
-            : 0
-          : Number(job.estimated_price),
+        estimated_price: finalPrice, // Enviamos el precio ya calculado
         requested_date: job.requested_date
           ? job.requested_date.toISOString()
           : null,

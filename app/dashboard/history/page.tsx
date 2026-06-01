@@ -39,18 +39,26 @@ export default async function HistoryPage() {
 
     serializedJobs = jobs.map((job) => {
       const isCancelled = job.status === "CANCELLED";
-      const hadPenalty = isCancelled && job.professional_id !== null;
+      const isProfessionalCancellation =
+        job.cancellation_reason === "CANCELADO_POR_PROFESIONAL";
+
+      const hadPenalty =
+        isCancelled &&
+        job.professional_id !== null &&
+        !isProfessionalCancellation;
+
+      const finalPrice = isCancelled
+        ? hadPenalty
+          ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
+          : 0
+        : Number(job.estimated_price);
 
       return {
         id: job.id,
         service_type: job.service_type,
         description: job.description,
         status: job.status,
-        estimated_price: isCancelled
-          ? hadPenalty
-            ? Math.max(1000, Math.round(Number(job.estimated_price) * 0.2))
-            : 0
-          : Number(job.estimated_price),
+        estimated_price: finalPrice,
         requested_date: job.requested_date
           ? job.requested_date.toISOString()
           : null,
