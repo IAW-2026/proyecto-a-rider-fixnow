@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Droplets, Zap, Flame, MapPin } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -33,7 +32,17 @@ interface EditJobModalProps {
   jobId: string;
   initialService: string;
   initialDescription: string;
+  initialDirection?: string | null;
+  isScheduled?: boolean; // <-- NUEVO: Para saber si mostramos el selector de fecha
+  initialRequestedDate?: string | null; // <-- NUEVO: Fecha original
 }
+
+// NUEVO: Diccionario de colores corporativos
+const serviceStyles: Record<ServiceType, string> = {
+  plomeria: "bg-plumbing border-plumbing text-white",
+  electricidad: "bg-electrical border-electrical text-slate-950",
+  gas: "bg-gas border-gas text-white",
+};
 
 export function EditJobModal({
   open,
@@ -42,14 +51,18 @@ export function EditJobModal({
   jobId,
   initialService,
   initialDescription,
+  initialDirection,
+  isScheduled,
+  initialRequestedDate,
 }: EditJobModalProps) {
   const [service, setService] = useState<ServiceType>(
     initialService.toLowerCase() as ServiceType,
   );
   const [description, setDescription] = useState(initialDescription);
-  const [address, setAddress] = useState("");
+  const [address, setAddress] = useState(initialDirection ?? "");
   const [lat, setLat] = useState<number | null>(null);
   const [lng, setLng] = useState<number | null>(null);
+  const [scheduledDateTime, setScheduledDateTime] = useState(""); // <-- NUEVO: Estado para la fecha
   const [submitting, setSubmitting] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -59,9 +72,30 @@ export function EditJobModal({
       setDescription(
         initialDescription.split("[INFORME DEL PROFESIONAL]:")[0].trim(),
       );
+      setAddress(initialDirection ?? "");
+      setLat(null);
+      setLng(null);
       setFormError(null);
+
+      // NUEVO: Formateamos la fecha original para que el input datetime-local la pueda leer
+      if (isScheduled && initialRequestedDate) {
+        const dateObj = new Date(initialRequestedDate);
+        const tzOffset = dateObj.getTimezoneOffset() * 60000;
+        const localISOTime = new Date(dateObj.getTime() - tzOffset)
+          .toISOString()
+          .slice(0, 16);
+        setScheduledDateTime(localISOTime);
+      } else {
+        setScheduledDateTime("");
+      }
     }
-  }, [open, initialService, initialDescription]);
+  }, [
+    open,
+    initialService,
+    initialDescription,
+    isScheduled,
+    initialRequestedDate,
+  ]);
 
   const handleSubmit = async () => {
     setFormError(null);
@@ -69,15 +103,35 @@ export function EditJobModal({
     if (address.trim() && (lat === null || lng === null))
       return setFormError("Esperando a ubicar tu dirección en el mapa...");
 
+    // NUEVO: Validación de la nueva fecha programada
+    let finalRequestedDate = null;
+    if (isScheduled) {
+      if (!scheduledDateTime)
+        return setFormError("Selecciona una fecha y hora para el turno.");
+      const selected = new Date(scheduledDateTime);
+      if (selected <= new Date())
+        return setFormError("La fecha programada debe ser a futuro.");
+      finalRequestedDate = selected.toISOString();
+    }
+
     setSubmitting(true);
     try {
       const payload: any = {
         service_type: service.toUpperCase(),
         description: description.trim(),
       };
+
+      if (address.trim()) {
+        payload.direction = address.trim();
+      }
+
       if (lat !== null && lng !== null) {
         payload.lat = lat;
         payload.lng = lng;
+      }
+
+      if (finalRequestedDate) {
+        payload.requested_date = finalRequestedDate;
       }
 
       const response = await fetch(`/api/v1/driver-mock/${jobId}`, {
@@ -120,9 +174,10 @@ export function EditJobModal({
                       key={s}
                       onClick={() => setService(s)}
                       className={cn(
-                        "flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-colors",
+                        "flex-1 py-2 rounded-lg border text-sm font-medium capitalize transition-all",
+                        // APLICAMOS LOS COLORES ACÁ
                         service === s
-                          ? "bg-amber-400 border-amber-400 text-slate-950"
+                          ? serviceStyles[s]
                           : "bg-white border-slate-300 text-slate-700 hover:bg-slate-50",
                       )}
                     >
@@ -143,6 +198,21 @@ export function EditJobModal({
                 className="resize-none mt-2 bg-slate-100 border-slate-300 text-slate-900 min-h-30"
               />
             </div>
+
+            {/* NUEVO: Selector de fecha condicional (Solo aparece si es un trabajo programado) */}
+            {isScheduled && (
+              <div className="space-y-2 pt-4 border-t border-slate-200">
+                <Label className="text-sm font-medium text-slate-900">
+                  Fecha y hora del turno
+                </Label>
+                <input
+                  type="datetime-local"
+                  value={scheduledDateTime}
+                  onChange={(e) => setScheduledDateTime(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 bg-slate-100 px-3 py-2 text-slate-900 outline-none focus:border-amber-400"
+                />
+              </div>
+            )}
           </div>
 
           <div className="space-y-4 flex flex-col">
@@ -170,8 +240,7 @@ export function EditJobModal({
               </div>
             )}
             <p className="text-xs text-slate-500">
-              Si dejas el campo de dirección vacío, mantendremos la ubicación
-              original.
+              Si dejas el campo vacío, mantendremos tu ubicación original.
             </p>
           </div>
         </div>
@@ -193,7 +262,7 @@ export function EditJobModal({
             <Button
               onClick={handleSubmit}
               disabled={submitting || !description.trim()}
-              className="bg-amber-400 text-slate-950 hover:bg-amber-300"
+              className="bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold"
             >
               {submitting ? "Guardando..." : "Guardar Cambios"}
             </Button>

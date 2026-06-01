@@ -145,6 +145,7 @@ export async function POST(req: Request) {
         client_id: client.id,
         service_type: prismaServiceType,
         description: description,
+        direction: address,
         lat: latNum,
         lng: lngNum,
         urgency: prismaUrgency,
