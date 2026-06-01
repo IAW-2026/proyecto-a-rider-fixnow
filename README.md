@@ -21,11 +21,11 @@ El sistema garantiza trazabilidad total: permite abonar el servicio de manera el
 Para evaluar la plataforma en su totalidad, solicitamos utilizar las siguientes credenciales provistas a través de nuestro entorno de pruebas en Clerk:
 
 - **Usuario 1 (Prueba de Onboarding):**
-  - **Email:** `rider1+clerktest@iaw.com`
+  - **Email:** `rider1+clerk_test@iaw.com`
   - **Contraseña:** `iawuser#1`
   - _Propósito:_ Utilizar este usuario para evaluar el flujo de registro por primera vez y la carga de datos obligatorios en la pantalla de "Completar Perfil".
 - **Usuario 2 (Prueba de Flujos Principales):**
-  - **Email:** `rider2+clerktest@iaw.com`
+  - **Email:** `rider2+clerk_test@iaw.com`
   - **Contraseña:** `iawuser#2`
   - _Propósito:_ Este usuario ya posee datos cargados y un historial. Utilizarlo para ejecutar las instrucciones de evaluación detalladas en la siguiente sección.
 
