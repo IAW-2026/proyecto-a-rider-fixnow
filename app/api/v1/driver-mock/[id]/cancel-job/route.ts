@@ -28,6 +28,7 @@ const ALLOWED_REASONS = new Set([
   "VALOR_TRABAJO_ALTO",
   "CAMBIE_DE_OPINION",
   "YA_NO_LO_NECESITO",
+  "CANCELADO_POR_PROFESIONAL",
 ]);
 
 export async function POST(
@@ -84,8 +85,12 @@ export async function POST(
     );
   }
 
+  const isProfessionalCancellation =
+    selectedReason === "CANCELADO_POR_PROFESIONAL";
   const requiresPayment =
-    job.status === "ACCEPTED" || job.status === "IN_PROGRESS";
+    !isProfessionalCancellation &&
+    (job.status === "ACCEPTED" || job.status === "IN_PROGRESS");
+
   const penaltyAmount = requiresPayment
     ? getPenaltyAmount(Number(job.estimated_price))
     : 0;
