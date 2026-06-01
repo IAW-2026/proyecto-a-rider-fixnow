@@ -21,6 +21,7 @@ import {
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ProfessionalProfileModal } from "@/components/ProfessionalProfileModal";
+import { EditJobModal } from "@/components/EditJobModal";
 
 const JobTrackerMap = dynamic(() => import("@/components/JobTrackerMap"), {
   ssr: false,
@@ -38,6 +39,7 @@ type ActiveJob = {
   id: string;
   service_type: string;
   description: string;
+  direction: string | null;
   status: string;
   cancellation_reason: string | null;
   cancellation_payment_required: boolean;
@@ -63,6 +65,10 @@ type DriverMockResponse = {
   penalty_amount?: number;
   estimated_price?: number;
   description?: string;
+  service_type?: string;
+  direction?: string | null;
+  lat?: number;
+  lng?: number;
 };
 
 type CancellationReason =
@@ -191,6 +197,9 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   const [profModalOpen, setProfModalOpen] = useState(false);
   const [isTimeoutModalOpen, setIsTimeoutModalOpen] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isProfCancelledModalOpen, setIsProfCancelledModalOpen] =
+    useState(false);
 
   useEffect(() => {
     setCurrentJob(job);
@@ -234,13 +243,17 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
   useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     // Si es inmediato y sigue pendiente, disparamos el contador
-    if (normalizedStatus === "PENDING" && currentJob.urgency === "IMMEDIATE") {
+    if (
+      normalizedStatus === "PENDING" &&
+      currentJob.urgency === "IMMEDIATE" &&
+      !isEditModalOpen
+    ) {
       timeoutId = setTimeout(() => {
         setIsTimeoutModalOpen(true);
       }, 15000); // 15 segundos para la demo
     }
     return () => clearTimeout(timeoutId);
-  }, [normalizedStatus, currentJob.urgency, retryCount]);
+  }, [normalizedStatus, currentJob.urgency, retryCount, isEditModalOpen]);
 
   const applyServerState = (updatedData: DriverMockResponse) => {
     const nextStatus = updatedData.status.toUpperCase();
@@ -258,6 +271,10 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       cancelled_at: updatedData.cancelled_at ?? prev.cancelled_at,
       estimated_price: updatedData.estimated_price ?? prev.estimated_price,
       description: updatedData.description ?? prev.description,
+      service_type: updatedData.service_type ?? prev.service_type,
+      direction: updatedData.direction ?? prev.direction,
+      lat: updatedData.lat ?? prev.lat,
+      lng: updatedData.lng ?? prev.lng,
     }));
   };
 
@@ -510,16 +527,19 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            onClick={refreshStatus}
-            disabled
-            className="border-slate-600 bg-slate-900 text-slate-100 hover:bg-slate-700"
-            title="Deshabilitado mientras el flujo real de actualización no esté conectado"
-          >
-            Actualizar estado
-          </Button>
+          {/* BOTÓN EDITAR */}
+          {normalizedStatus === "PENDING" && (
+            <Button
+              type="button"
+              onClick={() => setIsEditModalOpen(true)}
+              disabled={isSyncing}
+              className="bg-blue-600 text-white hover:bg-blue-500"
+            >
+              Editar solicitud
+            </Button>
+          )}
+
+          {/* BOTÓN SIMULAR AVANCE (Lo que ya tenías) */}
           <Button
             type="button"
             onClick={simulateAdvance}
@@ -532,6 +552,8 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           >
             Simular avance
           </Button>
+
+          {/* BOTÓN CANCELAR CLIENTE (Lo que ya tenías) */}
           <Button
             type="button"
             onClick={openCancelModal}
@@ -544,6 +566,41 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           >
             Cancelar servicio
           </Button>
+
+          {/* NUEVO BOTÓN SIMULAR CANCELACIÓN PROFESIONAL */}
+          {(normalizedStatus === "ACCEPTED" ||
+            normalizedStatus === "IN_PROGRESS") && (
+            <Button
+              type="button"
+              onClick={async () => {
+                setIsSyncing(true);
+                try {
+                  const res = await fetch(
+                    `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
+                    {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        reason: "CANCELADO_POR_PROFESIONAL",
+                      }),
+                    },
+                  );
+                  const data = await res.json();
+                  applyServerState(data);
+
+                  // --- ABRIMOS EL MODAL ---
+                  setIsProfCancelledModalOpen(true);
+                } finally {
+                  setIsSyncing(false);
+                }
+              }}
+              disabled={isSyncing}
+              className="bg-purple-600 text-white hover:bg-purple-500"
+            >
+              Simular: Prof. Cancela
+            </Button>
+          )}
+
           {syncError && (
             <span className="text-sm text-red-300">{syncError}</span>
           )}
@@ -996,6 +1053,40 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         professionalName={assignedProfessional?.full_name ?? null}
         open={profModalOpen}
         onOpenChange={setProfModalOpen}
+      />
+
+      {/* MODAL: EL PROFESIONAL CANCELÓ EL TRABAJO */}
+      <AppModal
+        open={isProfCancelledModalOpen}
+        onOpenChange={setIsProfCancelledModalOpen}
+        title="Servicio Cancelado"
+        description="El profesional ha cancelado el trabajo debido a un imprevisto. No te cobraremos ningún cargo por esta cancelación. Te recomendamos generar una nueva solicitud."
+        icon={<AlertCircle className="size-7 text-red-500" />}
+        className="border-slate-700 bg-slate-900 text-white z-9999"
+        footer={
+          <Button
+            className="w-full bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold"
+            onClick={() => {
+              setIsProfCancelledModalOpen(false);
+              // Redirigimos al Home (limpiando ActiveJob) y abrimos el Feedback
+              router.push(`/dashboard?feedback=${currentJob.id}`);
+            }}
+          >
+            Aceptar
+          </Button>
+        }
+      />
+
+      <EditJobModal
+        open={isEditModalOpen}
+        onOpenChange={setIsEditModalOpen}
+        jobId={currentJob.id}
+        initialService={currentJob.service_type}
+        initialDescription={currentJob.description}
+        initialDirection={currentJob.direction}
+        onSuccess={(updatedData) => {
+          applyServerState(updatedData);
+        }}
       />
     </div>
   );

@@ -36,7 +36,7 @@ interface HomeViewProps {
   userName?: string;
   address: string;
   recentJobs?: JobSummary[];
-  activeJob?: JobSummary | null; // <-- Nueva propiedad
+  activeJobs?: JobSummary[];
 }
 
 const getStatusBadge = (status: string) => {
@@ -93,7 +93,7 @@ export function HomeView({
   userName,
   address,
   recentJobs = [],
-  activeJob = null,
+  activeJobs = [],
 }: HomeViewProps) {
   const searchParams = useSearchParams();
   const router = useRouter();
@@ -143,7 +143,7 @@ export function HomeView({
 
   const handleServiceClick = (service: ServiceType) => {
     // EL BLOQUEO: Si hay un trabajo activo, no abrimos el modal
-    if (activeJob) {
+    if (activeJobs.length > 0) {
       setRequestError(
         "Ya tienes un trabajo en curso. Por favor finalízalo antes de solicitar otro.",
       );
@@ -176,22 +176,7 @@ export function HomeView({
     setProfModalOpen(true);
   };
 
-  let activeJobButtonText = "Seguimiento en vivo";
-  let activeJobButtonClass = "bg-amber-400 text-slate-950 hover:bg-amber-300";
-
-  if (activeJob) {
-    if (activeJob.status === "COMPLETED") {
-      activeJobButtonText = "Pago pendiente";
-      activeJobButtonClass =
-        "bg-emerald-400 text-slate-950 hover:bg-emerald-300";
-    } else if (
-      activeJob.status === "CANCELLED" &&
-      activeJob.cancellation_payment_required
-    ) {
-      activeJobButtonText = "Multa pendiente";
-      activeJobButtonClass = "bg-red-500 text-slate-950 hover:bg-red-400";
-    }
-  }
+  const activeJobCards = activeJobs;
 
   return (
     <div className="space-y-10">
@@ -225,37 +210,63 @@ export function HomeView({
       </div>
 
       {/* TRABAJO ACTIVO (Entre las cards y el historial) */}
-      {activeJob && (
+      {activeJobCards.length > 0 && (
         <div className="space-y-4">
           <h2 className="text-lg font-semibold text-white">Trabajo en curso</h2>
-          <div className="relative overflow-hidden rounded-lg border border-amber-500/30 bg-slate-800 p-6 transition-all hover:border-amber-500/50">
-            <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div className="flex items-center gap-4">
-                <div className="flex size-12 items-center justify-center rounded-xl bg-slate-900 border border-slate-700 shadow-sm">
-                  {getServiceIcon(activeJob.service_type)}
-                </div>
-                <div>
-                  <div className="flex items-center gap-3">
-                    <h3 className="font-semibold text-white capitalize">
-                      {activeJob.service_type}
-                    </h3>
-                    {getStatusBadge(activeJob.status)}
-                  </div>
-                  <p className="mt-1 text-sm text-slate-300">
-                    {activeJob.description
-                      .split("[INFORME DEL PROFESIONAL]:")[0]
-                      .trim()}
-                  </p>
-                </div>
-              </div>
+          <div className="grid gap-4 lg:grid-cols-2">
+            {activeJobCards.map((job) => {
+              let activeJobButtonText = "Seguimiento en vivo";
+              let activeJobButtonClass =
+                "bg-amber-400 text-slate-950 hover:bg-amber-300";
 
-              <Link
-                href="/dashboard/active"
-                className={`inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors ${activeJobButtonClass}`}
-              >
-                {activeJobButtonText} <ArrowRight className="size-4" />
-              </Link>
-            </div>
+              if (job.status === "COMPLETED") {
+                activeJobButtonText = "Pago pendiente";
+                activeJobButtonClass =
+                  "bg-emerald-400 text-slate-950 hover:bg-emerald-300";
+              } else if (
+                job.status === "CANCELLED" &&
+                job.cancellation_payment_required
+              ) {
+                activeJobButtonText = "Multa pendiente";
+                activeJobButtonClass =
+                  "bg-red-500 text-slate-950 hover:bg-red-400";
+              }
+
+              return (
+                <div
+                  key={job.id}
+                  className="relative overflow-hidden rounded-lg border border-amber-500/30 bg-slate-800 p-6 transition-all hover:border-amber-500/50"
+                >
+                  <div className="relative z-10 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="flex size-12 items-center justify-center rounded-xl bg-slate-900 border border-slate-700 shadow-sm">
+                        {getServiceIcon(job.service_type)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-3">
+                          <h3 className="font-semibold text-white capitalize">
+                            {job.service_type}
+                          </h3>
+                          {getStatusBadge(job.status)}
+                        </div>
+                        <p className="mt-1 text-sm text-slate-300">
+                          {job.description
+                            .split("[INFORME DEL PROFESIONAL]:")[0]
+                            .trim()}
+                        </p>
+                      </div>
+                    </div>
+
+                    <Link
+                      href="/dashboard/active"
+                      className={`inline-flex items-center justify-center gap-2 rounded-lg px-6 py-2.5 text-sm font-semibold transition-colors ${activeJobButtonClass}`}
+                    >
+                      {activeJobButtonText} <ArrowRight className="size-4" />
+                    </Link>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}

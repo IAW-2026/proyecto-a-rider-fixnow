@@ -162,3 +162,48 @@ export async function POST(
     description: updatedJob.description,
   });
 }
+
+export async function PATCH(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const { client, error } = await getAuthenticatedClient();
+  if (error) return error;
+
+  const { id } = await params;
+  const body = await request.json();
+
+  const job = await prisma.job.findFirst({
+    where: { id, client_id: client.id },
+  });
+
+  if (!job || job.status !== "PENDING") {
+    return NextResponse.json(
+      { error: "El trabajo no existe o ya no puede modificarse" },
+      { status: 400 },
+    );
+  }
+
+  const updatedJob = await prisma.job.update({
+    where: { id: job.id },
+    data: {
+      service_type: body.service_type ?? job.service_type,
+      direction: body.direction ?? job.direction,
+      description: body.description ?? job.description,
+      lat: body.lat ?? job.lat,
+      lng: body.lng ?? job.lng,
+      requested_date: body.requested_date
+        ? new Date(body.requested_date)
+        : job.requested_date,
+    },
+  });
+
+  return NextResponse.json({
+    status: updatedJob.status,
+    service_type: updatedJob.service_type,
+    description: updatedJob.description,
+    lat: updatedJob.lat,
+    lng: updatedJob.lng,
+    requested_date: updatedJob.requested_date,
+  });
+}
