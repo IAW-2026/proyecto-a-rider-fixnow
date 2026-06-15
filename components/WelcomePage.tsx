@@ -137,7 +137,7 @@ export function WelcomePage({ className }: WelcomePageProps) {
       </div>
 
       {/* Right Side - Logo & Services */}
-      <div className="hidden flex-col items-center justify-center bg-gradient-to-b from-slate-700 to-slate-950 px-12 lg:flex lg:w-[45%]">
+      <div className="hidden flex-col items-center justify-center bg-linear-to-b from-slate-700 to-slate-950 px-12 lg:flex lg:w-[45%]">
         {/* Large Logo */}
         <div className="mb-12 flex w-full items-center justify-center">
           <span className="text-8xl font-bold text-slate-950">

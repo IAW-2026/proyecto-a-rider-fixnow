@@ -286,7 +286,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(`/api/v1/driver-mock/${currentJob.id}`, {
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}`, {
         cache: "no-store",
       });
 
@@ -310,7 +310,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(`/api/v1/driver-mock/${currentJob.id}`, {
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}`, {
         method: "POST",
       });
 
@@ -397,18 +397,15 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(
-        `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            reason: selectedCancellationReason,
-          }),
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          reason: selectedCancellationReason,
+        }),
+      });
 
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as {
@@ -553,7 +550,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             Simular avance
           </Button>
 
-          {/* BOTÓN CANCELAR CLIENTE (Lo que ya tenías) */}
+          {/* BOTÓN CANCELAR CLIENTE */}
           <Button
             type="button"
             onClick={openCancelModal}
@@ -576,7 +573,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                 setIsSyncing(true);
                 try {
                   const res = await fetch(
-                    `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
+                    `/api/v1/jobs/${currentJob.id}/cancel`,
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },

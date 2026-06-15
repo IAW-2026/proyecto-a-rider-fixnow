@@ -149,19 +149,44 @@ export async function POST(req: Request) {
         lat: latNum,
         lng: lngNum,
         urgency: prismaUrgency,
-        requested_date: parsedDate, // Puede ser null si la urgencia es inmediata
+        requested_date: parsedDate,
         status: initialStatus,
         estimated_price: estimated_price,
         // professional_id, cancelled_at y cancellation_reason quedan null al crear
       },
     });
 
-    // 6- El paso futuro, avisarle a la driver app
-    /* TODO: Según tu diseño de APIs, acá tendrías que hacer un 'fetch' a la 
-        Driver App (ej: POST https://driver-app.com/api/jobs) para mandarle 
-        este nuevo Job y que empiece a buscar profesionales.
-        Por ahora lo dejamos comentado hasta que Lautaro termine su parte.
-        */
+    // 6- Avisarle a la driver app
+    try {
+      const driverUrl = process.env.DRIVER_APP_URL;
+      const secret = process.env.INTERNAL_API_SECET_KEY;
+
+      if (driverUrl && secret) {
+        await fetch(`${driverUrl}/api/v1/jobs`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${secret}`,
+          },
+          body: JSON.stringify({
+            job_id: newJob.id,
+            client_id: client.id,
+            client_full_name: client.full_name,
+            service_type: prismaServiceType,
+            description: description,
+            location: {
+              lat: latNum,
+              lng: lngNum,
+            },
+            urgency: prismaUrgency,
+            requested_date: parsedDate ? parsedDate.toISOString() : null,
+            estimated_price: estimated_price,
+          }),
+        });
+      }
+    } catch (error) {
+      console.error("Error notifying driver app:", error);
+    }
 
     // Devolvemos exito al frontend con los datos del trabajo creado
     return NextResponse.json(
