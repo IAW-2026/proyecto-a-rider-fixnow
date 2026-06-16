@@ -2,6 +2,50 @@ import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
 
+export async function GET(
+  request: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const user = await currentUser();
+  if (!user) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const email = user.emailAddresses[0]?.emailAddress;
+  const client = await prisma.client.findUnique({
+    where: { email: email as string },
+  });
+
+  if (!client) {
+    return NextResponse.json({ error: "Client not found" }, { status: 404 });
+  }
+
+  const { id } = await params;
+
+  const job = await prisma.job.findFirst({
+    where: { id, client_id: client.id },
+  });
+
+  if (!job) {
+    return NextResponse.json({ error: "Job not found" }, { status: 404 });
+  }
+
+  // Devolvemos el estado actual del trabajo a tu frontend
+  return NextResponse.json({
+    status: job.status,
+    professional_id: job.professional_id,
+    cancellation_reason: job.cancellation_reason,
+    cancellation_payment_required: job.cancellation_payment_required,
+    cancelled_at: job.cancelled_at ? job.cancelled_at.toISOString() : null,
+    estimated_price: Number(job.estimated_price),
+    description: job.description,
+    service_type: job.service_type,
+    direction: job.direction,
+    lat: Number(job.lat),
+    lng: Number(job.lng),
+  });
+}
+
 export async function PATCH(
   request: Request,
   { params }: { params: Promise<{ id: string }> },
