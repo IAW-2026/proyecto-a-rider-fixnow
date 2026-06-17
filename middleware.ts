@@ -6,7 +6,13 @@ const isPublicRoute = createRouteMatcher([
   "/api/v1/jobs/history",
   "/api/v1/jobs/:id/cancel",
   "/api/v1/jobs/:id/payment-confirmation",
-  // agregá acá cualquier otro endpoint interno
+  "/api/v1/jobs/:id",
+  "/api/v1/jobs",
+  "/api/v1/admin/jobs",
+  "/api/v1/clients",
+  "/api/v1/payments/:id",
+  "/api/v1/reviews",
+  "/api/v1/reviews/professional/:id",
 ]);
 
 export default clerkMiddleware(async (auth, request) => {
