@@ -136,7 +136,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
     try {
       if (status === "PENDING") {
         // AUTO-CANCELACIÓN: Nadie lo tomó.
-        await fetch(`/api/v1/driver-mock/${id}/cancel-job`, {
+        await fetch(`/api/v1/jobs/${id}/cancel`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ reason: "MUCHO_TIEMPO_ESPERA" }),
@@ -176,14 +176,11 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(
-        `/api/v1/driver-mock/${selectedJobId}/cancel-job`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: selectedReason }),
-        },
-      );
+      const response = await fetch(`/api/v1/jobs/${selectedJobId}/cancel`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ reason: selectedReason }),
+      });
 
       const data = await response.json();
       setIsCancelModalOpen(false);

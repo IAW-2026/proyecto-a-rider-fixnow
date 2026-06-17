@@ -58,7 +58,7 @@ export function ProfessionalProfileModal({
     if (professionalId) {
       setIsLoading(true);
       setShowReviews(false);
-      fetch(`/api/v1/feedback-mock/professional/${professionalId}`)
+      fetch(`/api/v1/reviews/professional/${professionalId}`)
         .then((res) => res.json())
         .then((mockData) => {
           setData(mockData);

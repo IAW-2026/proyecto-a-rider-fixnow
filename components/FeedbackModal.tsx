@@ -31,7 +31,7 @@ export function FeedbackModal({
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`/api/v1/feedback-mock/submit`, {
+      const response = await fetch(`/api/v1/reviews/submit`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

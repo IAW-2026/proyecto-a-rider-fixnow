@@ -134,7 +134,7 @@ export function EditJobModal({
         payload.requested_date = finalRequestedDate;
       }
 
-      const response = await fetch(`/api/v1/driver-mock/${jobId}`, {
+      const response = await fetch(`/api/v1/jobs/${jobId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

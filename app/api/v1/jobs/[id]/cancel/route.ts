@@ -105,6 +105,34 @@ export async function POST(
     },
   });
 
+  // ------------------------------------------------------------------
+  // ETAPA 3: AVISARLE A LAUTARO (DRIVER APP) QUE CANCELAMOS
+  // ------------------------------------------------------------------
+  try {
+    const driverUrl = process.env.DRIVER_APP_URL;
+    const secret = process.env.INTERNAL_API_SECRET;
+
+    // Solo le avisamos si tenemos las variables de entorno configuradas
+    // Y NO le avisamos si la cancelación la hizo él mismo (para no generar un bucle)
+    if (driverUrl && secret && !isProfessionalCancellation) {
+      await fetch(`${driverUrl}/api/jobs/${updatedJob.id}/cancellations`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${secret}`,
+        },
+        body: JSON.stringify({
+          cancellation_reason: selectedReason,
+        }),
+      });
+    }
+  } catch (error) {
+    console.error("Error al avisar la cancelación a la Driver App:", error);
+    // IMPORTANTE: Si la app de Lautaro está caída, no rompemos nuestra app.
+    // El trabajo ya se canceló exitosamente en nuestra base de datos arriba.
+  }
+  // ------------------------------------------------------------------
+
   return NextResponse.json({
     id: updatedJob.id,
     status: updatedJob.status,

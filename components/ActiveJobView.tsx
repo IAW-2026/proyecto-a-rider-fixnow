@@ -214,7 +214,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     let cancelled = false;
     setIsProfessionalLoading(true);
 
-    fetch(`/api/v1/feedback-mock/professional/${currentJob.professional_id}`)
+    fetch(`/api/v1/reviews/professional/${currentJob.professional_id}`)
       .then((res) => res.json())
       .then((mockData: AssignedProfessional) => {
         if (!cancelled) {
@@ -240,7 +240,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
 
   const normalizedStatus = currentJob.status.toUpperCase();
 
-  useEffect(() => {
+  /* useEffect(() => {
     let timeoutId: NodeJS.Timeout;
     // Si es inmediato y sigue pendiente, disparamos el contador
     if (
@@ -253,7 +253,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       }, 15000); // 15 segundos para la demo
     }
     return () => clearTimeout(timeoutId);
-  }, [normalizedStatus, currentJob.urgency, retryCount, isEditModalOpen]);
+  }, [normalizedStatus, currentJob.urgency, retryCount, isEditModalOpen]); */
 
   const applyServerState = (updatedData: DriverMockResponse) => {
     const nextStatus = updatedData.status.toUpperCase();
@@ -286,7 +286,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(`/api/v1/driver-mock/${currentJob.id}`, {
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}`, {
         cache: "no-store",
       });
 
@@ -305,12 +305,12 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     }
   };
 
-  const simulateAdvance = async () => {
+  /* const simulateAdvance = async () => {
     setSyncError(null);
     setIsSyncing(true);
 
     try {
-      const response = await fetch(`/api/v1/driver-mock/${currentJob.id}`, {
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}`, {
         method: "POST",
       });
 
@@ -327,7 +327,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     } finally {
       setIsSyncing(false);
     }
-  };
+  }; */
 
   const openPaymentModal = () => {
     const isPenaltyPayment =
@@ -357,12 +357,9 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsRedirectingToPayments(true);
 
     try {
-      const response = await fetch(
-        `/api/v1/driver-mock/${currentJob.id}/simulate-payment`,
-        {
-          method: "POST",
-        },
-      );
+      const response = await fetch(`/api/v1/payments/${currentJob.id}`, {
+        method: "POST",
+      });
 
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as {
@@ -397,18 +394,15 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsSyncing(true);
 
     try {
-      const response = await fetch(
-        `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            reason: selectedCancellationReason,
-          }),
+      const response = await fetch(`/api/v1/jobs/${currentJob.id}/cancel`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
         },
-      );
+        body: JSON.stringify({
+          reason: selectedCancellationReason,
+        }),
+      });
 
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as {
@@ -490,7 +484,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             <p className="mt-1 text-lg text-slate-400">
               Seguimiento en tiempo real de tu servicio
             </p>
-            {normalizedStatus === "PENDING" && (
+            {/* {normalizedStatus === "PENDING" && (
               <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 mt-4 max-w-2xl animate-in fade-in duration-300">
                 <AlertCircle className="size-5 text-amber-400 shrink-0" />
                 <p className="text-sm font-medium">
@@ -501,7 +495,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                   excedido.
                 </p>
               </div>
-            )}
+            )} */}
             {normalizedStatus === "CANCELLED" && cancellationSummary && (
               <p className="mt-2 max-w-2xl text-sm text-red-500">
                 Motivo de cancelación: {cancellationSummary.title}
@@ -527,6 +521,16 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
+          {/* BOTÓN ACTUALIZAR ESTADO */}
+          <Button
+            type="button"
+            onClick={refreshStatus}
+            disabled={isSyncing}
+            className="bg-amber-300 text-slate-950   hover:bg-amber-500"
+          >
+            <Clock className="size-4 mr-2" />
+            Actualizar estado
+          </Button>
           {/* BOTÓN EDITAR */}
           {normalizedStatus === "PENDING" && (
             <Button
@@ -540,7 +544,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           )}
 
           {/* BOTÓN SIMULAR AVANCE (Lo que ya tenías) */}
-          <Button
+          {/* <Button
             type="button"
             onClick={simulateAdvance}
             disabled={
@@ -551,9 +555,9 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             className="bg-amber-400 text-slate-950 hover:bg-amber-300"
           >
             Simular avance
-          </Button>
+          </Button> */}
 
-          {/* BOTÓN CANCELAR CLIENTE (Lo que ya tenías) */}
+          {/* BOTÓN CANCELAR CLIENTE */}
           <Button
             type="button"
             onClick={openCancelModal}
@@ -568,7 +572,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           </Button>
 
           {/* NUEVO BOTÓN SIMULAR CANCELACIÓN PROFESIONAL */}
-          {(normalizedStatus === "ACCEPTED" ||
+          {/* {(normalizedStatus === "ACCEPTED" ||
             normalizedStatus === "IN_PROGRESS") && (
             <Button
               type="button"
@@ -576,7 +580,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                 setIsSyncing(true);
                 try {
                   const res = await fetch(
-                    `/api/v1/driver-mock/${currentJob.id}/cancel-job`,
+                    `/api/v1/jobs/${currentJob.id}/cancel`,
                     {
                       method: "POST",
                       headers: { "Content-Type": "application/json" },
@@ -599,7 +603,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             >
               Simular: Prof. Cancela
             </Button>
-          )}
+          )} */}
 
           {syncError && (
             <span className="text-sm text-red-300">{syncError}</span>
@@ -1012,7 +1016,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       </AppModal>
 
       {/* MODAL DE TIEMPO DE ESPERA EXCEDIDO */}
-      <AppModal
+      {/* <AppModal
         open={isTimeoutModalOpen}
         onOpenChange={setIsTimeoutModalOpen}
         title="Sin profesionales disponibles"
@@ -1046,7 +1050,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             </Button>
           </>
         }
-      />
+      /> */}
 
       <ProfessionalProfileModal
         professionalId={currentJob.professional_id}
