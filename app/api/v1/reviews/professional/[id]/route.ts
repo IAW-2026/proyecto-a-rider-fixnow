@@ -1,82 +1,65 @@
 import { NextResponse } from "next/server";
 
 export async function GET(
-  _req: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params;
 
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  try {
+    const feedbackUrl = process.env.FEEDBACK_APP_URL;
+    const driverUrl = process.env.DRIVER_APP_URL; // Agregamos la URL de Lautaro
+    const secret = process.env.INTERNAL_API_SECRET;
 
-  // Simulamos una base de datos de Feedback alineada con Driver App
-  const professionalsDB: Record<string, any> = {
-    "prof-plomeria-001": {
-      id: "prof-plomeria-001",
-      full_name: "Mario Beder",
-      email: "mario@fixnow.com",
-      service_type: "plomeria",
-      rating: 4.8,
-      is_available: true,
-      is_verified: true,
-      phone: "+54 9 291 111 2222", // Info extra útil para el perfil
-      jobs_completed: 142,
-    },
-    "prof-electricidad-002": {
-      id: "prof-electricidad-002",
-      full_name: "Nicolas Lopez",
-      email: "nicolas@fixnow.com",
-      service_type: "electricidad",
-      rating: 4.9,
-      is_available: true,
-      is_verified: true,
-      phone: "+54 9 291 333 4444",
-      jobs_completed: 89,
-    },
-    "prof-gas-003": {
-      id: "prof-gas-003",
-      full_name: "Walter Rubio",
-      email: "walter@fixnow.com",
-      service_type: "gas",
-      rating: 4.5,
-      is_available: true,
-      is_verified: false,
-      phone: "+54 9 291 555 6666",
-      jobs_completed: 56,
-    },
-  };
+    if (!feedbackUrl || !driverUrl || !secret) {
+      return NextResponse.json(
+        { error: "Faltan variables de entorno" },
+        { status: 500 },
+      );
+    }
 
-  const professional = professionalsDB[id] || {
-    id: id,
-    full_name: "Profesional Asignado",
-    email: "contacto@fixnow.com",
-    service_type: "plomeria",
-    rating: 4.0,
-    is_available: true,
-    is_verified: false,
-    phone: "No disponible",
-    jobs_completed: 10,
-  };
+    // Hacemos las DOS consultas en paralelo para que sea súper rápido (API Composition)
+    const [feedbackResponse, driverResponse] = await Promise.all([
+      fetch(`${feedbackUrl}/api/reviews/professionals/${id}`, {
+        headers: { Authorization: `Bearer ${secret}` },
+      }),
+      fetch(`${driverUrl}/api/professionals/${id}`, {
+        // El endpoint nuevo que le pediste a Lauti
+        headers: { Authorization: `Bearer ${secret}` },
+      }),
+    ]);
 
-  // Añadimos reseñas falsas para la demo
-  const responseData = {
-    ...professional,
-    reviews: [
-      {
-        id: 1,
-        author: "María G.",
-        rating: 5,
-        comment: "Excelente, muy prolijo.",
-        date: "2026-05-15",
-      },
-      {
-        id: 2,
-        author: "Carlos M.",
-        rating: 4,
-        comment: "Arregló el problema a la perfección.",
-        date: "2026-05-02",
-      },
-    ],
-  };
+    if (!feedbackResponse.ok || !driverResponse.ok) {
+      throw new Error("Error al obtener datos de los microservicios");
+    }
 
-  return NextResponse.json(responseData);
+    const feedbackData = await feedbackResponse.json();
+    const professionalProfile = await driverResponse.json();
+
+    // Armamos el "Frankenstein" con datos 100% reales de ambos servidores
+    return NextResponse.json({
+      id: id,
+      full_name: professionalProfile.full_name,
+      email: professionalProfile.email,
+      service_type: professionalProfile.service_type,
+      phone: professionalProfile.phone,
+      is_verified: professionalProfile.is_verified,
+
+      rating: feedbackData.average_rating,
+      jobs_completed: feedbackData.total_reviews,
+      reviews: feedbackData.reviews.map((r: any) => ({
+        id: r.review_id,
+        author: "Cliente FixNow", // Opcional: Podrías cruzar esto con Prisma si guardaste los nombres de tus clientes
+        rating: r.rating,
+        comment: r.comment,
+        date: new Date(r.created_at).toLocaleDateString("es-AR"),
+      })),
+    });
+  } catch (error) {
+    console.error("Error orquestando datos del profesional:", error);
+    return NextResponse.json(
+      { error: "Error interno del servidor" },
+      { status: 500 },
+    );
+  }
 }
