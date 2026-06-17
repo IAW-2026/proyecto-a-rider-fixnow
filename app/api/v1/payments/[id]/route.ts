@@ -1,9 +1,7 @@
 import { NextResponse } from "next/server";
 import { currentUser } from "@clerk/nextjs/server";
 import { prisma } from "@/lib/prisma";
-import { revalidatePath } from "next/cache";
 
-// Usamos LA MISMA función que tenés en el otro endpoint para evitar discrepancias
 async function getAuthenticatedClient() {
   const user = await currentUser();
   if (!user)
@@ -23,19 +21,19 @@ async function getAuthenticatedClient() {
       error: NextResponse.json({ error: "Client not found" }, { status: 404 }),
     };
 
-  return { client };
+  return { client, clerkId: user.id };
 }
 
 export async function POST(
-  _req: Request,
+  request: Request,
   { params }: { params: Promise<{ id: string }> },
 ) {
-  const { client, error } = await getAuthenticatedClient();
+  const { client, clerkId, error } = await getAuthenticatedClient();
   if (error) return error;
 
   const { id } = await params;
 
-  // Buscamos el trabajo
+  // 1. Buscamos el trabajo en nuestra base de datos
   const job = await prisma.job.findFirst({
     where: {
       id: id,
@@ -43,34 +41,69 @@ export async function POST(
     },
   });
 
-  // Si tu terminal tira 404, es porque este if se está ejecutando
   if (!job) {
-    console.error(
-      `¡Fallo de ID! Trabajo ${id} no encontrado para el cliente de la BD: ${client.id}`,
-    );
     return NextResponse.json(
       { error: "Trabajo no encontrado" },
       { status: 404 },
     );
   }
 
-  const isCancelled = job.status === "CANCELLED";
+  if (!job.professional_id) {
+    return NextResponse.json(
+      { error: "El trabajo no tiene un profesional asignado" },
+      { status: 400 },
+    );
+  }
 
-  // Actualizamos a PAID
-  const updatedJob = await prisma.job.update({
-    where: { id: job.id },
-    data: {
-      status: isCancelled ? "CANCELLED" : "PAID",
-      cancellation_payment_required: false,
-    },
-  });
+  // 2. Conectamos con el servidor de Chiara
+  const paymentsUrl = process.env.PAYMENTS_APP_URL;
+  const secret = process.env.INTERNAL_API_SECRET;
 
-  // IMPORTANTE: Limpiamos la caché de Next.js para que el Dashboard re-lea la base de datos
-  revalidatePath("/dashboard/active");
-  revalidatePath("/dashboard");
+  if (!paymentsUrl || !secret) {
+    return NextResponse.json(
+      { error: "Faltan variables de entorno de configuración" },
+      { status: 500 },
+    );
+  }
 
-  return NextResponse.json({
-    status: updatedJob.status,
-    professional_id: updatedJob.professional_id,
-  });
+  try {
+    // 3. Enviamos los datos según el contrato de la Etapa 3
+    const response = await fetch(`${paymentsUrl}/api/payments`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${secret}`,
+      },
+      body: JSON.stringify({
+        job_id: job.id,
+        client_id: clerkId, // Enviamos el ID de Clerk o el de Prisma según hayan acordado
+        professional_id: job.professional_id,
+        amount: Number(job.estimated_price),
+        commission_rate: 0.1, // 10% de comisión para FixNow
+      }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || "La aplicación de pagos rechazó la solicitud",
+      );
+    }
+
+    const paymentData = await response.json();
+
+    // 4. IMPORTANTE: Acá YA NO guardamos "PAID" en nuestra base de datos.
+    // Solo le devolvemos los datos del pago (o el link de checkout) a tu Frontend.
+    return NextResponse.json(
+      {
+        message: "Redirigiendo a pagos...",
+        payment_id: paymentData.payment_id,
+        status: "PROCESSING",
+      },
+      { status: 200 },
+    );
+  } catch (err: any) {
+    console.error("Error conectando con Payments App:", err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
 }

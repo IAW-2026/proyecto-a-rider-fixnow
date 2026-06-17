@@ -1,12 +1,6 @@
-//Para qué: Es el Endpoint 3 de tu documento.
-// Es la "puerta" que le dejás abierta a Chiara para que te avise
-// "Che Cata, el cliente ya pagó el Job en MercadoPago",
-// así vos podés cambiar el estado en tu base de datos a PAID.
-// La aplicación de Chiara (Payments) va a "golpear" acá cuando
-// la tarjeta del cliente pase con éxito.
-
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 
 export async function POST(
   request: Request,
@@ -25,10 +19,10 @@ export async function POST(
   try {
     const body = await request.json();
 
-    // 2. Validar que el pago haya sido exitoso
+    // 2. Validar que el pago haya sido exitoso (Según el JSON que te manda Chiara)
     if (body.status !== "paid") {
       return NextResponse.json(
-        { error: "El estado del pago no es válido" },
+        { error: "El estado del pago no es válido o está pendiente" },
         { status: 400 },
       );
     }
@@ -43,8 +37,7 @@ export async function POST(
       );
     }
 
-    // 4. Actualizar estado. Si era una multa por cancelación, mantenemos el estado CANCELLED pero quitamos la deuda.
-    // Si era un trabajo normal, lo pasamos a PAID.
+    // 4. Actualizar la base de datos oficial
     const isCancelled = job.status === "CANCELLED";
 
     const updatedJob = await prisma.job.update({
@@ -55,6 +48,10 @@ export async function POST(
       },
     });
 
+    // 5. Limpiamos la caché de Next.js para que tu app web refleje el nuevo estado
+    revalidatePath("/dashboard/active");
+    revalidatePath("/dashboard/history");
+
     return NextResponse.json(
       {
         message: "Pago confirmado y procesado exitosamente",
@@ -64,9 +61,9 @@ export async function POST(
       { status: 200 },
     );
   } catch (error) {
-    console.error("Error confirmando pago:", error);
+    console.error("Error procesando el Webhook de pago:", error);
     return NextResponse.json(
-      { error: "Error procesando la confirmación de pago" },
+      { error: "Error interno del servidor al procesar el pago" },
       { status: 500 },
     );
   }
