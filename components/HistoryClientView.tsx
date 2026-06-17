@@ -98,7 +98,7 @@ export function HistoryClientView({ jobs }: HistoryClientViewProps) {
       setModalProfName("");
 
       fetch(
-        `/api/v1/feedback-mock/professional/${selectedHistoryJob.professional_id}`,
+        `/api/v1/reviews/professional/${selectedHistoryJob.professional_id}`,
       )
         .then((res) => res.json())
         .then((data) => {
