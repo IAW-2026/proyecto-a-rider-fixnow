@@ -214,7 +214,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     let cancelled = false;
     setIsProfessionalLoading(true);
 
-    fetch(`/api/v1/feedback-mock/professional/${currentJob.professional_id}`)
+    fetch(`/api/v1/reviews/professional/${currentJob.professional_id}`)
       .then((res) => res.json())
       .then((mockData: AssignedProfessional) => {
         if (!cancelled) {
@@ -357,12 +357,9 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
     setIsRedirectingToPayments(true);
 
     try {
-      const response = await fetch(
-        `/api/v1/driver-mock/${currentJob.id}/simulate-payment`,
-        {
-          method: "POST",
-        },
-      );
+      const response = await fetch(`/api/v1/payments/${currentJob.id}`, {
+        method: "POST",
+      });
 
       if (!response.ok) {
         const errorPayload = (await response.json().catch(() => null)) as {
