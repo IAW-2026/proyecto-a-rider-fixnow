@@ -38,8 +38,12 @@ export async function GET(
       throw new Error("Error al obtener datos de los microservicios");
     }
 
-    const feedbackData = await feedbackResponse.json();
-    const professionalProfile = await driverResponse.json();
+    const feedbackData = feedbackResponse.ok
+      ? await feedbackResponse.json()
+      : { average_rating: 0, reviews: [] };
+    const professionalProfile = driverResponse.ok
+      ? await driverResponse.json()
+      : { full_name: "Usuario no encontrado", phone: "N/A" };
 
     // Armamos el "Frankenstein" con datos 100% reales de ambos servidores
     return NextResponse.json({
@@ -50,15 +54,16 @@ export async function GET(
       phone: professionalProfile.phone,
       is_verified: professionalProfile.is_verified,
 
-      rating: feedbackData.average_rating,
+      rating: feedbackData.average_rating || 0,
       jobs_completed: feedbackData.total_reviews,
-      reviews: feedbackData.reviews.map((r: any) => ({
-        id: r.review_id,
-        author: "Cliente FixNow", // Opcional: Podrías cruzar esto con Prisma si guardaste los nombres de tus clientes
-        rating: r.rating,
-        comment: r.comment,
-        date: new Date(r.created_at).toLocaleDateString("es-AR"),
-      })),
+      reviews:
+        feedbackData.reviews.map((r: any) => ({
+          id: r.review_id,
+          author: "Cliente FixNow", // Opcional: Podrías cruzar esto con Prisma si guardaste los nombres de tus clientes
+          rating: r.rating,
+          comment: r.comment,
+          date: new Date(r.created_at).toLocaleDateString("es-AR"),
+        })) || [],
     });
   } catch (error) {
     console.error("Error orquestando datos del profesional:", error);
