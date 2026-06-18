@@ -159,7 +159,7 @@ export async function POST(req: Request) {
     // 6- Avisarle a la driver app
     try {
       const driverUrl = process.env.DRIVER_APP_URL;
-      const secret = process.env.INTERNAL_API_SECET_KEY;
+      const secret = process.env.INTERNAL_API_SECRET_KEY;
 
       if (driverUrl && secret) {
         await fetch(`${driverUrl}/api/jobs`, {
