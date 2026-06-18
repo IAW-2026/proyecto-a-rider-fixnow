@@ -29,6 +29,11 @@ export async function GET(
       }),
     ]);
 
+    if (!feedbackResponse.ok)
+      console.error("Fallo Nacho:", await feedbackResponse.text());
+    if (!driverResponse.ok)
+      console.error("Fallo Lauti:", await driverResponse.text());
+
     if (!feedbackResponse.ok || !driverResponse.ok) {
       throw new Error("Error al obtener datos de los microservicios");
     }
