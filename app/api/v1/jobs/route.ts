@@ -162,7 +162,7 @@ export async function POST(req: Request) {
       const secret = process.env.INTERNAL_API_SECET_KEY;
 
       if (driverUrl && secret) {
-        await fetch(`${driverUrl}/api/v1/jobs`, {
+        await fetch(`${driverUrl}/api/jobs`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
