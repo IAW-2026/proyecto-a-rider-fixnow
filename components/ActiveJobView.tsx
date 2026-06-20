@@ -706,7 +706,8 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                     alt="Profesional asignado"
                     className="object-contain p-1"
                   />
-                  <AvatarFallback className="h-full w-full bg-slate-700 text-2xl font-semibold text-white">
+
+                  {/* <AvatarFallback className="h-full w-full bg-slate-700 text-2xl font-semibold text-white">
                     {assignedProfessional
                       ? assignedProfessional.full_name
                           .split(" ")
@@ -715,7 +716,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                           .substring(0, 2)
                           .toUpperCase()
                       : "PR"}
-                  </AvatarFallback>
+                  </AvatarFallback> */}
                 </Avatar>
 
                 <div className="min-w-0 flex-1 space-y-3">

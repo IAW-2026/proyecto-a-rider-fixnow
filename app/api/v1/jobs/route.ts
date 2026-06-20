@@ -159,9 +159,10 @@ export async function POST(req: Request) {
     // 6- Avisarle a la driver app
     try {
       const driverUrl = process.env.DRIVER_APP_URL;
-      const secret = process.env.INTERNAL_API_SECRET_KEY;
+      const secret = process.env.INTERNAL_API_SECRET;
 
       if (driverUrl && secret) {
+        console.log("Entro al if");
         await fetch(`${driverUrl}/api/jobs`, {
           method: "POST",
           headers: {
@@ -183,6 +184,10 @@ export async function POST(req: Request) {
             estimated_price: estimated_price,
           }),
         });
+      } else {
+        console.log(
+          "DRIVER_APP_URL or INTERNAL_API_SECRET_KEY not configured, skipping driver notification",
+        );
       }
     } catch (error) {
       console.error("Error notifying driver app:", error);
