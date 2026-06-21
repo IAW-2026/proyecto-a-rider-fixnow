@@ -135,7 +135,6 @@ export async function POST(req: Request) {
     // Todo trabajo nuevo nace con el estado "pendiente"
     const initialStatus = "PENDING";
 
-    // Como es mockup, por ahora inventamos un precio estimado.
     // En el futuro, esto deberia venir del profesional una vez que acepta el job (endpoint de driver app como mockup)
     const estimated_price = 15000.0;
 
