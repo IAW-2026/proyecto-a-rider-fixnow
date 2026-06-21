@@ -100,9 +100,8 @@ const getStatusBadge = (status: string) => {
 export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
   const router = useRouter();
 
-  // Estados para la Simulación y API
+  // Estados para sincronización con la API Real
   const [isSyncing, setIsSyncing] = useState(false);
-  const [autoCancelled, setAutoCancelled] = useState<string[]>([]);
 
   // Estados para el Modal de Cancelación Manual
   const [isCancelModalOpen, setIsCancelModalOpen] = useState(false);
@@ -110,49 +109,15 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
   const [selectedReason, setSelectedReason] =
     useState<CancellationReason>("CAMBIE_DE_OPINION");
 
-  // Estados para el Modal de Pago (Multas)
+  // Estados para el Modal de Pago (Multas Reales)
   const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
   const [paymentFlow, setPaymentFlow] = useState<PaymentFlow | null>(null);
+  const [isRedirectingToPayments, setIsRedirectingToPayments] = useState(false);
 
   // Estado para el Modal de Edición de Trabajo
   const [jobToEdit, setJobToEdit] = useState<ScheduledJob | null>(null);
 
-  // LÓGICA DE SIMULACIÓN (Demos)
-
-  // 1. Un profesional toma el turno
-  const simulateAccept = async (id: string) => {
-    setIsSyncing(true);
-    try {
-      await fetch(`/api/v1/driver-mock/${id}`, { method: "POST" });
-      router.refresh();
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // 2. Llega el día y la hora del turno
-  const simulateTimeArrived = async (id: string, status: string) => {
-    setIsSyncing(true);
-    try {
-      if (status === "PENDING") {
-        // AUTO-CANCELACIÓN: Nadie lo tomó.
-        await fetch(`/api/v1/jobs/${id}/cancel`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ reason: "MUCHO_TIEMPO_ESPERA" }),
-        });
-        setAutoCancelled((prev) => [...prev, id]); // Activamos la UI de auto-cancelado
-      } else if (status === "ACCEPTED") {
-        // EN PROGRESO: El profesional llegó a tu casa.
-        await fetch(`/api/v1/driver-mock/${id}`, { method: "POST" });
-        router.push("/dashboard/active"); // Salta a seguimiento en vivo
-      }
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
-  // LÓGICA DE CANCELACIÓN MANUAL Y MULTAS
+  // --- LÓGICA DE FLUJOS REALES ---
 
   const handlePayPenaltyClick = (job: ScheduledJob) => {
     setSelectedJobId(job.id);
@@ -185,7 +150,6 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
       const data = await response.json();
       setIsCancelModalOpen(false);
 
-      // Si el trabajo ya estaba "ACCEPTED", requiere pago de multa
       if (data.requires_payment) {
         setPaymentFlow({
           kind: "penalty",
@@ -195,11 +159,11 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
             "La cancelación genera una multa porque el trabajo ya estaba asignado a un profesional.",
         });
         setIsPaymentModalOpen(true);
-        router.refresh();
-      } else {
-        // Si estaba PENDING, se cancela gratis y desaparece.
-        router.refresh();
       }
+
+      router.refresh();
+    } catch (error) {
+      console.error("Error al cancelar el trabajo:", error);
     } finally {
       setIsSyncing(false);
     }
@@ -207,20 +171,33 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
 
   const confirmPayment = async () => {
     if (!selectedJobId) return;
-    setIsSyncing(true);
+    setIsRedirectingToPayments(true);
+
     try {
-      await fetch(`/api/v1/driver-mock/${selectedJobId}/simulate-payment`, {
+      const response = await fetch(`/api/v1/payments/${selectedJobId}`, {
         method: "POST",
       });
-      setIsPaymentModalOpen(false);
-      router.refresh();
-      // Lo mandamos a la Home para que salte el modal de Feedback
-      setTimeout(
-        () => router.push(`/dashboard?feedback=${selectedJobId}`),
-        500,
-      );
-    } finally {
-      setIsSyncing(false);
+
+      if (!response.ok) {
+        const errorPayload = await response.json().catch(() => null);
+        console.error(errorPayload?.error ?? "Error al procesar el pago");
+        // Nota: ScheduledJobsView no tenía estado de syncError, si no querés agregarlo,
+        // podés omitir el setSyncError acá y solo cortar la ejecución.
+        setIsRedirectingToPayments(false);
+        return;
+      }
+
+      const data = await response.json();
+
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        console.error("No se recibió URL de pago");
+        setIsRedirectingToPayments(false);
+      }
+    } catch (error) {
+      console.error("Error al redirigir al pago:", error);
+      setIsRedirectingToPayments(false);
     }
   };
 
@@ -232,15 +209,6 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
         </h1>
         <p className="mt-1 text-lg text-slate-400">
           Gestioná tus turnos reservados para los próximos días
-        </p>
-      </div>
-
-      <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200">
-        <AlertCircle className="size-5 text-amber-400 shrink-0" />
-        <p className="text-sm font-medium">
-          <span className="font-bold">Modo Simulación:</span> Utilizá los
-          botones inferiores de cada tarjeta para simular el avance del tiempo o
-          asignar un profesional automáticamente.
         </p>
       </div>
 
@@ -264,32 +232,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
               ? new Date(job.requested_date)
               : null;
 
-            // ESTADO ESPECIAL: El trabajo se auto-canceló por falta de profesionales
-            if (autoCancelled.includes(job.id)) {
-              return (
-                <div
-                  key={job.id}
-                  className="flex flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center shadow-sm animate-in fade-in duration-300 h-full"
-                >
-                  <AlertCircle className="size-10 text-red-400 mb-3" />
-                  <h3 className="font-semibold text-white mb-1">
-                    Turno Cancelado
-                  </h3>
-                  <p className="text-sm text-red-200 mb-6 max-w-sm">
-                    Tu solicitud no fue tomada por ningún profesional. Probá
-                    generando una nueva.
-                  </p>
-                  <Button
-                    onClick={() => router.refresh()}
-                    className="bg-red-500 text-white hover:bg-red-600 px-8 transition-all"
-                  >
-                    Eliminar
-                  </Button>
-                </div>
-              );
-            }
-
-            // ESTADO ESPECIAL: El trabajo tiene una multa pendiente
+            // ESTADO: El trabajo tiene una multa pendiente en la DB
             if (
               job.status === "CANCELLED" &&
               job.cancellation_payment_required
@@ -297,7 +240,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
               return (
                 <div
                   key={job.id}
-                  className="flex flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center shadow-sm animate-in fade-in duration-300 h-full"
+                  className="flex flex-col items-center justify-center rounded-xl border border-red-500/30 bg-red-500/10 p-8 text-center shadow-sm h-full"
                 >
                   <AlertCircle className="size-10 text-red-400 mb-3" />
                   <h3 className="font-semibold text-white mb-1">
@@ -317,7 +260,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
               );
             }
 
-            // TARJETA NORMAL
+            // TARJETA DE TRABAJO ACTIVO (PENDING O ACCEPTED)
             return (
               <div
                 key={job.id}
@@ -331,7 +274,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
                       </div>
                       <div>
                         <h3 className="font-semibold text-white capitalize">
-                          {job.service_type}
+                          {job.service_type.toLowerCase()}
                         </h3>
                         <p className="text-xs text-slate-500">
                           ID: {job.id.substring(0, 8)}...
@@ -388,8 +331,8 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
                     </div>
                   </div>
 
-                  {/* BOTONERA DE CONTROL Y SIMULACIÓN */}
-                  <div className="flex flex-col gap-2 ">
+                  {/* ACCIONES REALES */}
+                  <div className="flex flex-col gap-2 pt-2">
                     <Button
                       size="sm"
                       variant="outline"
@@ -411,28 +354,6 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
                         Editar Turno
                       </Button>
                     )}
-
-                    {job.status === "PENDING" && (
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="bg-blue-500 border-blue-500/50 text-white hover:bg-blue-500/50 flex-1 sm:flex-none"
-                        onClick={() => simulateAccept(job.id)}
-                        disabled={isSyncing}
-                      >
-                        Simular: Asignar Profesional
-                      </Button>
-                    )}
-
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="bg-emerald-500 border-emerald-500/50 text-white hover:bg-emerald-500/50 flex-1 sm:flex-none"
-                      onClick={() => simulateTimeArrived(job.id, job.status)}
-                      disabled={isSyncing}
-                    >
-                      Simular: Llegó el día
-                    </Button>
                   </div>
                 </div>
               </div>
@@ -504,7 +425,12 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
       {/* 2. Modal de Pago de Multa */}
       <AppModal
         open={isPaymentModalOpen}
-        onOpenChange={setIsPaymentModalOpen}
+        onOpenChange={(open) => {
+          setIsPaymentModalOpen(open);
+          if (!open) {
+            setIsRedirectingToPayments(false);
+          }
+        }}
         title={paymentFlow?.title ?? "Redirigiendo a Payments"}
         description={paymentFlow?.description ?? ""}
         icon={<Zap className="size-7 text-amber-300" />}
@@ -512,25 +438,36 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
         footer={
           <>
             <Button
+              type="button"
               variant="outline"
-              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
+              className="flex-1 cursor-pointer border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
               onClick={() => setIsPaymentModalOpen(false)}
-              disabled={isSyncing}
+              disabled={isRedirectingToPayments}
             >
               Cancelar
             </Button>
             <Button
-              className="flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300"
+              type="button"
+              className="flex-1 cursor-pointer bg-amber-400 text-slate-950 hover:bg-amber-300 font-semibold"
               onClick={confirmPayment}
-              disabled={isSyncing}
+              disabled={isRedirectingToPayments}
             >
-              {isSyncing
-                ? "Procesando..."
-                : `Ir a Payments ($${paymentFlow?.amount.toLocaleString("es-AR")})`}
+              {isRedirectingToPayments ? "Redirigiendo..." : `Ir a Payments`}
             </Button>
           </>
         }
-      />
+      >
+        {paymentFlow?.kind === "penalty" && (
+          <div className="mt-2 flex flex-col items-center justify-center rounded-2xl border border-red-500/30 bg-red-500/10 p-8 text-center animate-in zoom-in-95 duration-300">
+            <span className="mb-2 block text-sm font-semibold uppercase tracking-wider text-red-300/80">
+              Cargo por cancelación
+            </span>
+            <span className="text-5xl font-extrabold tracking-tight text-red-400">
+              ${paymentFlow.amount.toLocaleString("es-AR")}
+            </span>
+          </div>
+        )}
+      </AppModal>
 
       {/* 3. Modal de Edición de Turno */}
       {jobToEdit && (
@@ -545,7 +482,7 @@ export function ScheduledJobsView({ jobs }: ScheduledJobsViewProps) {
           initialDirection={jobToEdit.direction}
           isScheduled={true}
           initialRequestedDate={jobToEdit.requested_date}
-          onSuccess={(updatedData) => {
+          onSuccess={() => {
             router.refresh();
             setJobToEdit(null);
           }}

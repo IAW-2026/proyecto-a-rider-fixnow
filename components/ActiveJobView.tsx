@@ -362,23 +362,26 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       });
 
       if (!response.ok) {
-        const errorPayload = (await response.json().catch(() => null)) as {
-          error?: string;
-        } | null;
-
+        const errorPayload = await response.json().catch(() => null);
+        console.error(errorPayload?.error ?? "Error al procesar el pago");
         setSyncError(
-          errorPayload?.error ?? "No se pudo registrar el pago del trabajo.",
+          errorPayload?.error ?? "No se pudo generar el link de pago.",
         );
         setIsRedirectingToPayments(false);
         return;
       }
 
-      router.refresh();
-      window.setTimeout(() => {
-        router.push(`/dashboard?feedback=${currentJob.id}`);
-      }, 1400);
+      const data = await response.json();
+
+      if (data.checkout_url) {
+        window.location.href = data.checkout_url;
+      } else {
+        console.error("No se recibió URL de pago");
+        setSyncError("Problemas al generar la redirección.");
+        setIsRedirectingToPayments(false);
+      }
     } catch (error) {
-      console.error("Error al simular el pago:", error);
+      console.error("Error al redirigir al pago:", error);
       setIsRedirectingToPayments(false);
     }
   };
@@ -429,7 +432,13 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       }
 
       router.refresh();
-      router.push(`/dashboard?feedback=${currentJob.id}`);
+
+      if (currentJob.professional_id) {
+        router.push(`/dashboard?feedback=${currentJob.id}`);
+      } else {
+        // Si no había profesional, volvemos al dashboard limpio
+        router.push(`/dashboard`);
+      }
     } catch (error) {
       console.error("Error al cancelar el servicio:", error);
       setSyncError("Error de red al cancelar el servicio.");
@@ -707,7 +716,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                     className="object-contain p-1"
                   />
 
-                  {/* <AvatarFallback className="h-full w-full bg-slate-700 text-2xl font-semibold text-white">
+                  <AvatarFallback className="h-full w-full bg-slate-700 text-2xl font-semibold text-white">
                     {assignedProfessional
                       ? assignedProfessional.full_name
                           .split(" ")
@@ -716,7 +725,7 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
                           .substring(0, 2)
                           .toUpperCase()
                       : "PR"}
-                  </AvatarFallback> */}
+                  </AvatarFallback>
                 </Avatar>
 
                 <div className="min-w-0 flex-1 space-y-3">

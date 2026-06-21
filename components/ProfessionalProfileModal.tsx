@@ -158,39 +158,52 @@ export function ProfessionalProfileModal({
 
           {/* Sección de Reseñas */}
           <div className="border-t border-slate-700 pt-4">
-            {!showReviews ? (
-              <Button
-                onClick={() => setShowReviews(true)}
-                variant="outline"
-                className="w-full border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white"
-              >
-                <MessageSquareText className="size-4 mr-2" />
-                Ver opiniones de clientes ({data.reviews.length})
-              </Button>
-            ) : (
-              <div className="space-y-3">
-                <h4 className="text-sm font-semibold text-slate-300 mb-3">
-                  Últimas Reseñas
-                </h4>
-                {data.reviews.map((review) => (
-                  <div
-                    key={review.id}
-                    className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3 text-sm"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="font-medium text-amber-300">
-                        {review.author}
-                      </span>
-                      <div className="flex gap-0.5">
-                        {renderStars(review.rating)}
+            {data?.reviews && data.reviews.length > 0 ? (
+              !showReviews ? (
+                <Button
+                  onClick={() => setShowReviews(true)}
+                  variant="outline"
+                  className="w-full border-slate-700 bg-slate-800 text-white hover:bg-slate-700 hover:text-white"
+                >
+                  <MessageSquareText className="size-4 mr-2" />
+                  Ver opiniones de clientes ({data.reviews.length})
+                </Button>
+              ) : (
+                <div className="space-y-3">
+                  <h4 className="text-sm font-semibold text-slate-300 mb-3">
+                    Últimas Reseñas
+                  </h4>
+                  {data.reviews.map((review) => (
+                    <div
+                      key={review.id}
+                      className="rounded-lg bg-slate-800/50 border border-slate-700/50 p-3 text-sm"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-amber-300">
+                          {review.author}
+                        </span>
+                        <div className="flex gap-0.5">
+                          {renderStars(review.rating)}
+                        </div>
                       </div>
+                      <p className="text-slate-300 mb-2">{review.comment}</p>
+                      <span className="text-xs text-slate-500">
+                        {review.date}
+                      </span>
                     </div>
-                    <p className="text-slate-300 mb-2">{review.comment}</p>
-                    <span className="text-xs text-slate-500">
-                      {review.date}
-                    </span>
-                  </div>
-                ))}
+                  ))}
+                </div>
+              )
+            ) : (
+              <div className="flex flex-col items-center justify-center space-y-2 rounded-xl border border-dashed border-slate-700 bg-slate-800/50 p-6 text-center">
+                <MessageSquareText className="size-8 text-slate-500" />
+                <p className="text-sm font-medium text-slate-300">
+                  Aún no hay reseñas
+                </p>
+                <p className="text-xs text-slate-500">
+                  Este profesional es nuevo o todavía no recibió calificaciones
+                  de otros usuarios.
+                </p>
               </div>
             )}
           </div>
@@ -214,14 +227,17 @@ export function ProfessionalProfileModal({
     </AppModal>
   );
 }
-
-// Componente helper para las iniciales
+// Componente helper para las iniciales (Pegar al final del archivo)
 function UserIcon({ name }: { name: string }) {
+  if (!name)
+    return <span className="text-xl font-bold text-slate-400">PR</span>;
+
   const initials = name
     .split(" ")
     .map((n) => n[0])
     .join("")
     .substring(0, 2)
     .toUpperCase();
+
   return <span className="text-xl font-bold text-slate-400">{initials}</span>;
 }

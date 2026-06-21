@@ -92,12 +92,35 @@ export async function POST(
 
     const paymentData = await response.json();
 
-    // 4. IMPORTANTE: Acá YA NO guardamos "PAID" en nuestra base de datos.
-    // Solo le devolvemos los datos del pago (o el link de checkout) a tu Frontend.
+    // Extraemos la ruta que devuelve Chiara
+    let checkoutUrl =
+      paymentData.checkout_url || paymentData.url || paymentData.init_point;
+
+    if (!checkoutUrl) {
+      throw new Error(
+        "La aplicación de pagos no devolvió una URL de redirección.",
+      );
+    }
+
+    // ARREGLO: Si Chiara nos mandó una ruta relativa, la convertimos en URL absoluta
+    if (!checkoutUrl.startsWith("http")) {
+      // Le quitamos la barra final a paymentsUrl por si la tiene (ej: "http://localhost:3001/")
+      const baseUrl = paymentsUrl.replace(/\/$/, "");
+      // Nos aseguramos de que el path arranque con barra
+      const path = checkoutUrl.startsWith("/")
+        ? checkoutUrl
+        : `/${checkoutUrl}`;
+
+      // Armamos el link completo
+      checkoutUrl = `${baseUrl}${path}`;
+    }
+
+    // 4. Devolvemos la URL absoluta y lista para usar a tu Frontend
     return NextResponse.json(
       {
         message: "Redirigiendo a pagos...",
         payment_id: paymentData.payment_id,
+        checkout_url: checkoutUrl,
         status: "PROCESSING",
       },
       { status: 200 },

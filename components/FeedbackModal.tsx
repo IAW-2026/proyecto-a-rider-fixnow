@@ -25,6 +25,7 @@ export function FeedbackModal({
   const [comment, setComment] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [alreadyReviewed, setAlreadyReviewed] = useState(false);
 
   const handleSubmit = async () => {
     if (rating === 0) return;
@@ -55,6 +56,11 @@ export function FeedbackModal({
             setComment("");
           }, 500);
         }, 2000);
+      } else {
+        const errorData = await response.json().catch(() => ({}));
+        if (errorData.error === "ALREADY_REVIEWED") {
+          setAlreadyReviewed(true); // Activamos la pantalla de duplicado
+        }
       }
     } catch (error) {
       console.error("Error submitting feedback:", error);
@@ -75,7 +81,27 @@ export function FeedbackModal({
       description={isSuccess ? "" : "¿Qué te pareció el trabajo realizado?"}
       className="max-w-md border-slate-700 bg-slate-900 text-white z-9999 py-4"
     >
-      {isSuccess ? (
+      {alreadyReviewed ? (
+        <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-in fade-in zoom-in duration-300">
+          <div className="size-16 rounded-full bg-blue-500/20 flex items-center justify-center text-blue-400">
+            <MessageSquareText className="size-8" />
+          </div>
+          <h3 className="text-xl font-bold text-white">Reseña ya enviada</h3>
+          <p className="text-slate-400 text-center text-sm px-4">
+            Ya dejaste tu opinión sobre este trabajo anteriormente. ¡Muchas
+            gracias por tu aporte!
+          </p>
+          <Button
+            onClick={() => {
+              setAlreadyReviewed(false);
+              onOpenChange(false);
+            }}
+            className="mt-4 bg-slate-800 text-white hover:bg-slate-700"
+          >
+            Cerrar
+          </Button>
+        </div>
+      ) : isSuccess ? (
         <div className="flex flex-col items-center justify-center py-10 space-y-4 animate-in fade-in zoom-in duration-300">
           <div className="size-16 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-400">
             <CheckCircle2 className="size-8" />
