@@ -1,6 +1,6 @@
 //Para qué: Para alimentar los gráficos de tus Dashboards.
 // Un prisma.job.findMany() puro y duro sin filtrar por cliente,
-// protegido por el INTERNAL_API_SECRET.
+// protegido por la key de Analytics.
 // Este lo vas a consumir VOS MISMA desde el Analytics Dashboard
 // para armar los gráficos y sacar las estadísticas globales de la plataforma
 
@@ -10,7 +10,7 @@ import { prisma } from "@/lib/prisma";
 export async function GET(request: Request) {
   // 1. Validar seguridad inter-servicios (Dashboards -> Rider App)
   const authHeader = request.headers.get("Authorization");
-  const secret = process.env.INTERNAL_API_SECRET;
+  const secret = process.env.ANALYTICS_SECRET_KEY;
 
   if (!secret || authHeader !== `Bearer ${secret}`) {
     return NextResponse.json({ error: "No autorizado" }, { status: 401 });

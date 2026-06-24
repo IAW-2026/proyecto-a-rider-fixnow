@@ -55,6 +55,13 @@ export async function POST(
     );
   }
 
+  let finalAmount = Number(job.estimated_price);
+
+  // Si el trabajo fue cancelado y requiere pago, cobramos la multa (20% o mínimo $1000)
+  if (job.status === "CANCELLED" && job.cancellation_payment_required) {
+    finalAmount = Math.max(1000, Math.round(Number(job.estimated_price) * 0.2));
+  }
+
   // 2. Conectamos con el servidor de Chiara
   const paymentsUrl = process.env.PAYMENTS_APP_URL;
   const secret = process.env.INTERNAL_API_SECRET;
@@ -78,7 +85,7 @@ export async function POST(
         job_id: job.id,
         client_id: clerkId, // Enviamos el ID de Clerk o el de Prisma según hayan acordado
         professional_id: job.professional_id,
-        amount: Number(job.estimated_price),
+        amount: finalAmount,
         commission_rate: 0.1, // 10% de comisión para FixNow
       }),
     });
