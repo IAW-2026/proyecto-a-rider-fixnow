@@ -62,11 +62,16 @@ export async function PATCH(
 
   if (authHeader === `Bearer ${secret}`) {
     // Si Lautaro mandó el secreto correcto, actualizamos nuestra DB con lo que nos dijo
+    const incomingStatus = body.status.toUpperCase();
     const updateData: any = { status: body.status.toUpperCase() };
 
     if (body.professional_id) updateData.professional_id = body.professional_id;
     if (body.estimated_price) updateData.estimated_price = body.estimated_price;
     if (body.description) updateData.description = body.description;
+
+    if (incomingStatus === "CANCELLED") {
+      updateData.cancellation_reason = "CANCELADO_POR_PROFESIONAL";
+    }
 
     try {
       const updatedJob = await prisma.job.update({
