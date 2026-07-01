@@ -240,20 +240,15 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
 
   const normalizedStatus = currentJob.status.toUpperCase();
 
-  /* useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    // Si es inmediato y sigue pendiente, disparamos el contador
+  useEffect(() => {
+    // Verificamos si el trabajo fue cancelado y si el motivo es el que forzamos en el backend
     if (
-      normalizedStatus === "PENDING" &&
-      currentJob.urgency === "IMMEDIATE" &&
-      !isEditModalOpen
+      currentJob.status.toUpperCase() === "CANCELLED" &&
+      currentJob.cancellation_reason === "CANCELADO_POR_PROFESIONAL"
     ) {
-      timeoutId = setTimeout(() => {
-        setIsTimeoutModalOpen(true);
-      }, 15000); // 15 segundos para la demo
+      setIsProfCancelledModalOpen(true);
     }
-    return () => clearTimeout(timeoutId);
-  }, [normalizedStatus, currentJob.urgency, retryCount, isEditModalOpen]); */
+  }, [currentJob.status, currentJob.cancellation_reason]);
 
   const applyServerState = (updatedData: DriverMockResponse) => {
     const nextStatus = updatedData.status.toUpperCase();
@@ -304,30 +299,6 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
       setIsSyncing(false);
     }
   };
-
-  /* const simulateAdvance = async () => {
-    setSyncError(null);
-    setIsSyncing(true);
-
-    try {
-      const response = await fetch(`/api/v1/jobs/${currentJob.id}`, {
-        method: "POST",
-      });
-
-      if (!response.ok) {
-        setSyncError("No se pudo simular el avance.");
-        return;
-      }
-
-      const updatedData = (await response.json()) as DriverMockResponse;
-      applyServerState(updatedData);
-    } catch (error) {
-      console.error("Error al simular avance del trabajo:", error);
-      setSyncError("Error de red al simular avance.");
-    } finally {
-      setIsSyncing(false);
-    }
-  }; */
 
   const openPaymentModal = () => {
     const isPenaltyPayment =
@@ -493,18 +464,6 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
             <p className="mt-1 text-lg text-slate-400">
               Seguimiento en tiempo real de tu servicio
             </p>
-            {/* {normalizedStatus === "PENDING" && (
-              <div className="flex items-center gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-amber-200 mt-4 max-w-2xl animate-in fade-in duration-300">
-                <AlertCircle className="size-5 text-amber-400 shrink-0" />
-                <p className="text-sm font-medium">
-                  <span className="font-bold">Modo Simulación:</span> Para
-                  evaluar la disponibilidad, si en 15 segundos no utilizas el
-                  botón "Simular avance" para asignar un especialista, se
-                  disparará automáticamente un aviso de tiempo de espera
-                  excedido.
-                </p>
-              </div>
-            )} */}
             {normalizedStatus === "CANCELLED" && cancellationSummary && (
               <p className="mt-2 max-w-2xl text-sm text-red-500">
                 Motivo de cancelación: {cancellationSummary.title}
@@ -551,21 +510,6 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
               Editar solicitud
             </Button>
           )}
-
-          {/* BOTÓN SIMULAR AVANCE (Lo que ya tenías) */}
-          {/* <Button
-            type="button"
-            onClick={simulateAdvance}
-            disabled={
-              isSyncing ||
-              normalizedStatus === "COMPLETED" ||
-              normalizedStatus === "CANCELLED"
-            }
-            className="bg-amber-400 text-slate-950 hover:bg-amber-300"
-          >
-            Simular avance
-          </Button> */}
-
           {/* BOTÓN CANCELAR CLIENTE */}
           <Button
             type="button"
@@ -579,40 +523,6 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           >
             Cancelar servicio
           </Button>
-
-          {/* NUEVO BOTÓN SIMULAR CANCELACIÓN PROFESIONAL */}
-          {/* {(normalizedStatus === "ACCEPTED" ||
-            normalizedStatus === "IN_PROGRESS") && (
-            <Button
-              type="button"
-              onClick={async () => {
-                setIsSyncing(true);
-                try {
-                  const res = await fetch(
-                    `/api/v1/jobs/${currentJob.id}/cancel`,
-                    {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        reason: "CANCELADO_POR_PROFESIONAL",
-                      }),
-                    },
-                  );
-                  const data = await res.json();
-                  applyServerState(data);
-
-                  // --- ABRIMOS EL MODAL ---
-                  setIsProfCancelledModalOpen(true);
-                } finally {
-                  setIsSyncing(false);
-                }
-              }}
-              disabled={isSyncing}
-              className="bg-purple-600 text-white hover:bg-purple-500"
-            >
-              Simular: Prof. Cancela
-            </Button>
-          )} */}
 
           {syncError && (
             <span className="text-sm text-red-300">{syncError}</span>
@@ -1024,43 +934,6 @@ export function ActiveJobView({ job }: ActiveJobViewProps) {
           </div>
         )}
       </AppModal>
-
-      {/* MODAL DE TIEMPO DE ESPERA EXCEDIDO */}
-      {/* <AppModal
-        open={isTimeoutModalOpen}
-        onOpenChange={setIsTimeoutModalOpen}
-        title="Sin profesionales disponibles"
-        description="Tiempo de espera excedido. En este momento no hay profesionales activos cerca de tu zona."
-        icon={<Clock className="size-7 text-amber-300" />}
-        className="border-slate-700 bg-slate-900 text-white z-9999"
-        footer={
-          <>
-            <Button
-              variant="outline"
-              className="flex-1 border-slate-600 bg-slate-800 text-slate-100 hover:bg-slate-700"
-              onClick={() => {
-                setIsTimeoutModalOpen(false);
-                // Acá reutilizamos tu lógica de cancelar, seteando la razón:
-                setSelectedCancellationReason("MUCHO_TIEMPO_ESPERA");
-                confirmCancellation();
-              }}
-              disabled={isSyncing}
-            >
-              {isSyncing ? "Cancelando..." : "Cancelar solicitud"}
-            </Button>
-            <Button
-              className="flex-1 bg-amber-400 text-slate-950 hover:bg-amber-300"
-              onClick={() => {
-                setIsTimeoutModalOpen(false);
-                // Si el usuario elige esperar un poco más, le damos otros 15s
-                setRetryCount((prev) => prev + 1);
-              }}
-            >
-              Seguir esperando
-            </Button>
-          </>
-        }
-      /> */}
 
       <ProfessionalProfileModal
         professionalId={currentJob.professional_id}
